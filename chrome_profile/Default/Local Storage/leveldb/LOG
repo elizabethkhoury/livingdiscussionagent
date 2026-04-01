@@ -1,0 +1,8 @@
+2026/03/25-18:35:20.941 37f0 Reusing MANIFEST C:\Users\eliza\prompthunt-reddit-bot\chrome_profile\Default\Local Storage\leveldb/MANIFEST-000001
+2026/03/25-18:35:20.948 37f0 Recovering log #7
+2026/03/25-18:35:20.948 37f0 Level-0 table #10: started
+2026/03/25-18:35:20.957 37f0 Level-0 table #10: 29876 bytes OK
+2026/03/25-18:35:20.958 37f0 Recovering log #10
+2026/03/25-18:35:20.962 37f0 Reusing old log C:\Users\eliza\prompthunt-reddit-bot\chrome_profile\Default\Local Storage\leveldb/000010.log 
+2026/03/25-18:35:20.967 37f0 Delete type=0 #7
+2026/03/25-18:35:20.967 37f0 Delete type=2 #11
