@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from reddit_agent.models import (
@@ -69,6 +69,13 @@ class Repository:
         self.session.add(candidate)
         await self.session.flush()
         return candidate
+
+    async def find_candidate_by_source(self, *, reddit_post_id: str | None, permalink: str):
+        clauses = [RedditCandidate.permalink == permalink]
+        if reddit_post_id:
+            clauses.append(RedditCandidate.reddit_post_id == reddit_post_id)
+        stmt = select(RedditCandidate).where(or_(*clauses)).limit(1)
+        return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def add_features(self, candidate_id: str, payload: dict):
         feature = CandidateFeature(candidate_id=candidate_id, **payload)
@@ -154,6 +161,14 @@ class Repository:
     async def get_action(self, action_id: str):
         return await self.session.get(Action, action_id)
 
+    async def list_actions_for_candidate(self, candidate_id: str):
+        stmt = (
+            select(Action)
+            .where(Action.candidate_id == candidate_id)
+            .order_by(Action.created_at.asc())
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
     async def latest_manual_post_action(self, draft_id: str):
         stmt = (
             select(Action)
@@ -193,10 +208,8 @@ class Repository:
             .select_from(Draft)
             .where(Draft.status == DraftStatus.approved.value)
         )
-        manual_posts = await self.session.scalar(
-            select(func.count())
-            .select_from(Action)
-            .where(Action.action_type == 'manual_post_confirmed')
+        executed_posts = await self.session.scalar(
+            select(func.count()).select_from(Action).where(Action.action_type == 'posted')
         )
         reward_total = await self.session.scalar(
             select(func.coalesce(func.sum(Observation.reward_delta), 0.0))
@@ -214,7 +227,8 @@ class Repository:
         return {
             'queued_drafts': queued or 0,
             'approvals': approvals or 0,
-            'manual_posts': manual_posts or 0,
+            'manual_posts': executed_posts or 0,
+            'executed_posts': executed_posts or 0,
             'total_reward': reward_total or 0.0,
             'conversions': conversion_total or 0,
             'by_product': dict(by_product),

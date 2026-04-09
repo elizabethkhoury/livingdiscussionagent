@@ -58,7 +58,7 @@ export default async function QueuePage() {
                 <article className="candidate-card">
                   <div className="candidate-title">Nothing queued right now.</div>
                   <div className="candidate-body">
-                    Ingest new Reddit threads from the API and the queue will populate here.
+                    Ingest new Reddit threads from the browser discovery flow and the queue will populate here.
                   </div>
                 </article>
               ) : null}
@@ -73,10 +73,10 @@ export default async function QueuePage() {
           <div className="panel-body">
             <div className="split">
               <div className="metric-card">
-                <div className="metric-label">Manual posting</div>
+                <div className="metric-label">Autonomous posting</div>
                 <p className="muted">
-                  Approval only hands the operator a thread URL and final reply body. Posting stays
-                  manual in the MVP.
+                  Approval now queues a browser post job. Replay shows whether the Kernel session
+                  posted successfully or failed for review.
                 </p>
               </div>
               <div className="metric-card">

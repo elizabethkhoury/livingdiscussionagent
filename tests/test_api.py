@@ -19,3 +19,4 @@ def test_api_smoke():
         analytics = client.get('/analytics')
         assert analytics.status_code == 200
         assert 'queued_drafts' in analytics.json()
+        assert 'executed_posts' in analytics.json()

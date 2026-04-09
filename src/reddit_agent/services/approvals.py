@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from reddit_agent.models import ApprovalDecision, DraftStatus
+from reddit_agent.models import ActionType, ApprovalDecision, DraftStatus
 from reddit_agent.repository import Repository
 
 
 class ApprovalService:
+    def __init__(self, posting_dispatcher=None):
+        self.posting_dispatcher = posting_dispatcher
+
     async def decide(
         self,
         *,
@@ -32,21 +35,17 @@ class ApprovalService:
             edited_body=edited_body,
         )
         handoff_url = None
+        post_action = None
         if decision == ApprovalDecision.approve and candidate is not None:
-            action = await repository.create_action(
+            post_action = await repository.create_action(
                 candidate.id,
-                'manual_handoff',
+                ActionType.post_requested.value,
                 draft_id=draft.id,
-                notes='Operator approved draft and should manually post on Reddit.',
+                notes='Operator approved draft. Browser posting queued.',
                 payload={'permalink': candidate.permalink, 'body': final_body},
             )
             handoff_url = candidate.permalink
-            await repository.create_action(
-                candidate.id,
-                'manual_post_confirmed',
-                draft_id=draft.id,
-                notes='Placeholder confirmation event for manual posting workflow.',
-                payload={'handoff_action_id': action.id},
-            )
         await repository.session.commit()
-        return draft, handoff_url
+        if post_action is not None and self.posting_dispatcher is not None:
+            await self.posting_dispatcher.dispatch(post_action.id)
+        return draft, handoff_url, post_action

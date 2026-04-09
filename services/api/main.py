@@ -109,7 +109,7 @@ def serialize_candidate(candidate: RedditCandidate):
 async def ingest_reddit(repository: RepositoryDep):
     runtime = get_runtime()
     discovery = DiscoveryService(
-        reddit_client=runtime['reddit_client'],
+        reddit_browser_discovery=runtime['reddit_browser_discovery'],
         llm_provider=runtime['llm_provider'],
         lifecycle_rules=runtime['lifecycle_rules'],
     )
@@ -175,7 +175,9 @@ async def generate_draft(candidate_id: str, repository: RepositoryDep):
 @app.post('/approvals/{draft_id}', response_model=ApprovalResponse)
 async def submit_approval(draft_id: str, payload: ApprovalRequest, repository: RepositoryDep):
     try:
-        draft, handoff_url = await ApprovalService().decide(
+        draft, handoff_url, post_action = await ApprovalService(
+            get_runtime()['posting_dispatcher']
+        ).decide(
             repository=repository,
             draft_id=draft_id,
             decision=payload.decision,
@@ -189,6 +191,9 @@ async def submit_approval(draft_id: str, payload: ApprovalRequest, repository: R
         status=draft.status,
         handoff_url=handoff_url,
         final_body=draft.body,
+        post_action_id=post_action.id if post_action else None,
+        post_status='queued' if post_action else None,
+        live_view_url=None,
     )
 
 
@@ -234,7 +239,7 @@ async def get_replay(run_id: str, repository: RepositoryDep):
     stmt = (
         select(RedditCandidate)
         .where(RedditCandidate.id == run_id)
-        .options(selectinload(RedditCandidate.drafts))
+        .options(selectinload(RedditCandidate.drafts), selectinload(RedditCandidate.actions))
     )
     candidate = (await repository.session.execute(stmt)).scalar_one_or_none()
     if candidate is None:
@@ -257,7 +262,9 @@ async def get_default_agent(repository: RepositoryDep):
 async def list_manual_posts(repository: RepositoryDep):
     stmt = (
         select(Action)
-        .where(Action.action_type == 'manual_handoff')
+        .where(
+            Action.action_type.in_(['manual_handoff', 'post_requested', 'posted', 'post_failed'])
+        )
         .order_by(Action.created_at.desc())
         .limit(100)
     )

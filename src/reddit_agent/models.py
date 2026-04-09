@@ -36,6 +36,10 @@ class ActionType(StrEnum):
     queued = 'queued'
     manual_handoff = 'manual_handoff'
     manual_post_confirmed = 'manual_post_confirmed'
+    post_requested = 'post_requested'
+    posting_started = 'posting_started'
+    posted = 'posted'
+    post_failed = 'post_failed'
     observation = 'observation'
     reflection = 'reflection'
 

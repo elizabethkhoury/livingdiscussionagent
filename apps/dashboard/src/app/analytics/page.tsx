@@ -16,7 +16,7 @@ export default async function AnalyticsPage() {
           <div className="metric-grid">
             <MetricCard label="Queued drafts" value={analytics.queued_drafts} />
             <MetricCard label="Approvals" value={analytics.approvals} />
-            <MetricCard label="Manual posts" value={analytics.manual_posts} />
+            <MetricCard label="Executed posts" value={analytics.executed_posts} />
             <MetricCard label="Reward total" value={analytics.total_reward.toFixed(2)} />
             <MetricCard label="Conversions" value={analytics.conversions} />
           </div>

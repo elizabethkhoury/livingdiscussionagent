@@ -10,6 +10,7 @@ with workflow.unsafe.imports_passed_through():
     from reddit_agent.repository import Repository
     from reddit_agent.services.discovery import DiscoveryService
     from reddit_agent.services.drafting import DraftingService
+    from reddit_agent.services.posting import PostingService
     from reddit_agent.workflows.graph import build_discovery_graph, build_drafting_graph
 
 
@@ -20,7 +21,7 @@ class AgentActivities:
         async with SessionLocal() as session:
             repository = Repository(session)
             discovery = DiscoveryService(
-                reddit_client=runtime['reddit_client'],
+                reddit_browser_discovery=runtime['reddit_browser_discovery'],
                 llm_provider=runtime['llm_provider'],
                 lifecycle_rules=runtime['lifecycle_rules'],
             )
@@ -38,6 +39,15 @@ class AgentActivities:
             repository = Repository(session)
             graph = build_drafting_graph(DraftingService(get_runtime()['llm_provider']), repository)
             return await graph.ainvoke({'queued_candidate_ids': queued_candidate_ids})
+
+    @activity.defn
+    async def post_approved_draft(self, action_id: str):
+        runtime = get_runtime()
+        async with SessionLocal() as session:
+            repository = Repository(session)
+            posting = PostingService(runtime['reddit_browser_poster'])
+            action = await posting.post_approved_draft(repository=repository, action_id=action_id)
+            return {'action_id': action.id, 'action_type': action.action_type}
 
 
 @workflow.defn
@@ -58,3 +68,14 @@ class DiscoverCandidatesWorkflow:
             start_to_close_timeout=timedelta(minutes=2),
         )
         return {**created, **drafted}
+
+
+@workflow.defn
+class PostApprovedDraftWorkflow:
+    @workflow.run
+    async def run(self, action_id: str):
+        return await workflow.execute_activity(
+            AgentActivities.post_approved_draft,
+            action_id,
+            start_to_close_timeout=timedelta(minutes=5),
+        )

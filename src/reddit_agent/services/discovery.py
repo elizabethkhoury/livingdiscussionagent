@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from reddit_agent.clients.reddit import RedditClient
 from reddit_agent.repository import Repository
 from reddit_agent.rules import (
     ProductRule,
@@ -12,8 +11,8 @@ from reddit_agent.rules import (
 
 
 class DiscoveryService:
-    def __init__(self, reddit_client: RedditClient, llm_provider, lifecycle_rules):
-        self.reddit_client = reddit_client
+    def __init__(self, reddit_browser_discovery, llm_provider, lifecycle_rules):
+        self.reddit_browser_discovery = reddit_browser_discovery
         self.llm_provider = llm_provider
         self.lifecycle_rules = lifecycle_rules
 
@@ -25,7 +24,13 @@ class DiscoveryService:
         product_rules: dict[str, ProductRule],
     ):
         created = []
-        for payload in await self.reddit_client.fetch_new_posts(subreddit_rule.name):
+        for payload in await self.reddit_browser_discovery.fetch_new_posts(subreddit_rule.name):
+            existing = await repository.find_candidate_by_source(
+                reddit_post_id=payload.get('reddit_post_id'),
+                permalink=payload['permalink'],
+            )
+            if existing is not None:
+                continue
             text = f'{payload["title"]} {payload["body"]}'.strip()
             safety_reason = detect_safety_block(text)
             route = route_product(text)
@@ -63,6 +68,7 @@ class DiscoveryService:
                 'decision_reason': abstain_reason or 'threshold_pass',
                 'evaluation_summary': evaluation.summary,
                 'product_catalog': list(product_rules),
+                **payload.pop('browser_metadata', {}),
             }
             candidate = await repository.create_candidate(
                 {

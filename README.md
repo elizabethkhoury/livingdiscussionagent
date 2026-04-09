@@ -1,6 +1,6 @@
 # PromptHunt Reddit Agent MVP
 
-Compliance-first Reddit opportunity agent that discovers high-signal threads, drafts one-product replies for approval, tracks outcomes, and updates an agent health score over time.
+Compliance-first Reddit opportunity agent that discovers high-signal threads through a Kernel-backed browser, drafts one-product replies for approval, posts approved replies through an agent-controlled browser session, tracks outcomes, and updates an agent health score over time.
 
 ## What changed
 
@@ -9,12 +9,13 @@ Compliance-first Reddit opportunity agent that discovers high-signal threads, dr
   - FastAPI for the operator/API surface
   - a shared Python domain package for scoring, lifecycle, and replay
   - LangGraph + Temporal-ready workflows for orchestration
+  - Kernel + Browser Use for browser-based Reddit discovery and posting
   - a Next.js dashboard in [`apps/dashboard`](./apps/dashboard)
   - Docker Compose infra in [`infra/compose`](./infra/compose)
 
 ## Quick start
 
-1. Copy `.env.example` to `.env` and fill in Reddit and analytics credentials.
+1. Copy `.env.example` to `.env` and fill in Kernel, browser-agent, and analytics credentials.
 2. Start local infra:
 
 ```bash

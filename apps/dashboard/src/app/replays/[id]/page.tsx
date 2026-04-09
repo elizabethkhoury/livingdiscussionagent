@@ -46,6 +46,31 @@ export default async function ReplayPage({
                 ))}
               </div>
             </div>
+            <div className="metric-card">
+              <div className="metric-label">Posting actions</div>
+              <div className="candidate-list">
+                {replay.actions.map((action) => (
+                  <article key={action.id} className="candidate-card">
+                    <div className="candidate-meta">
+                      <span className="tag">{action.action_type}</span>
+                      <span className="tag">{new Date(action.created_at).toLocaleString()}</span>
+                    </div>
+                    <div className="candidate-body">{action.notes ?? 'No notes recorded.'}</div>
+                    {'external_comment_url' in action.payload &&
+                    typeof action.payload['external_comment_url'] === 'string' ? (
+                      <a
+                        className="button ghost"
+                        href={action.payload['external_comment_url']}
+                        target="_blank"
+                      >
+                        View Posted Comment
+                      </a>
+                    ) : null}
+                    <pre className="trace-box">{JSON.stringify(action.payload, null, 2)}</pre>
+                  </article>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>

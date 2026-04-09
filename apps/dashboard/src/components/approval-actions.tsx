@@ -92,14 +92,16 @@ export function ApprovalActions({ candidateId, apiBaseUrl }: Props) {
                   deferredDraftBody,
                   feedback,
                 );
-                setFlash(`Approved. Open thread: ${payload.handoff_url}`);
+                setFlash(
+                  `Approved. Post queued${payload.post_action_id ? ` as ${payload.post_action_id.slice(0, 8)}` : ''}.`,
+                );
               } catch (error) {
                 setFlash(error instanceof Error ? error.message : 'Approval failed.');
               }
             })
           }
         >
-          Approve + Handoff
+          Approve + Queue Post
         </button>
         <button
           className="button secondary"

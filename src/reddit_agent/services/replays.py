@@ -1,4 +1,4 @@
-from reddit_agent.schemas import DraftRead, ReplayRead
+from reddit_agent.schemas import ActionRead, DraftRead, ReplayRead
 
 
 def build_replay(candidate):
@@ -16,6 +16,16 @@ def build_replay(candidate):
         )
         for draft in candidate.drafts
     ]
+    actions = [
+        ActionRead(
+            id=action.id,
+            action_type=action.action_type,
+            notes=action.notes,
+            payload=action.payload,
+            created_at=action.created_at,
+        )
+        for action in sorted(candidate.actions, key=lambda item: item.created_at)
+    ]
     return ReplayRead(
         candidate_id=candidate.id,
         title=candidate.title,
@@ -24,4 +34,5 @@ def build_replay(candidate):
         route_product=candidate.route_product,
         trace=candidate.decision_trace,
         drafts=drafts,
+        actions=actions,
     )

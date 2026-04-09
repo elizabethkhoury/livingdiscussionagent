@@ -74,6 +74,17 @@ class ApprovalResponse(BaseModel):
     status: DraftStatus
     handoff_url: str | None
     final_body: str
+    post_action_id: str | None = None
+    post_status: str | None = None
+    live_view_url: str | None = None
+
+
+class ActionRead(BaseModel):
+    id: str
+    action_type: str
+    notes: str | None
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
 
 
 class ObservationRequest(BaseModel):
@@ -115,12 +126,14 @@ class ReplayRead(BaseModel):
     route_product: str | None
     trace: dict[str, Any]
     drafts: list[DraftRead] = Field(default_factory=list)
+    actions: list[ActionRead] = Field(default_factory=list)
 
 
 class AnalyticsRead(BaseModel):
     queued_drafts: int
     approvals: int
     manual_posts: int
+    executed_posts: int
     total_reward: float
     conversions: int
     by_product: dict[str, int]

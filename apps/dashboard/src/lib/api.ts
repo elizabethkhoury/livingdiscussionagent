@@ -59,6 +59,7 @@ export async function fetchAnalytics() {
     queued_drafts: number;
     approvals: number;
     manual_posts: number;
+    executed_posts: number;
     total_reward: number;
     conversions: number;
     by_product: Record<string, number>;
@@ -81,6 +82,13 @@ export async function fetchReplay(id: string) {
       critic_notes: Record<string, unknown>;
       similarity_score: number;
       token_usage: number;
+    }[];
+    actions: {
+      id: string;
+      action_type: string;
+      notes: string | null;
+      payload: Record<string, unknown>;
+      created_at: string;
     }[];
   }>(`/replays/${id}`);
 }
