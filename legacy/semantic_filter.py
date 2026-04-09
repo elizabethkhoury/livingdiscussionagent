@@ -13,7 +13,6 @@ TOPICS = [
     'where do you store and save your best prompts',
     'how do you keep track of prompts that worked well',
     'best way to save and organize AI prompts so you can reuse them',
-
     # Writing better prompts
     'how do I write better prompts for ChatGPT or Claude',
     'my prompts give completely different results every time I run them',
@@ -22,14 +21,12 @@ TOPICS = [
     'prompt engineering tips for getting better AI outputs',
     'prompt templates that reliably produce good results',
     'how to structure a prompt to stop AI from going off-track',
-
     # Wasted credits / tokens
     'wasting tokens because my prompts are too vague',
     'burning through API credits because prompts keep failing',
     'how to write prompts that use fewer tokens but get better results',
     'optimizing prompts to save money on ChatGPT API calls',
     'reducing hallucinations by improving my system prompt',
-
     # Tool-specific prompting issues
     'Cursor AI not following my instructions in the prompt',
     'Lovable keeps producing wrong code because my prompts are unclear',
@@ -40,14 +37,12 @@ TOPICS = [
     'vibe coding prompts for Cursor that actually produce good code',
     'how to write better prompts for AI coding assistants',
     'system prompt tips to make Claude or ChatGPT do exactly what I want',
-
     # Finding and sharing prompts
     'where can I find proven prompts that actually work',
     'sharing prompts that gave amazing results',
     'is there a library of good AI prompts I can search',
     'looking for a database of prompts for different use cases',
     'best community for sharing and discovering AI prompts',
-
     # Context window and memory
     'AI keeps forgetting context between sessions how to fix prompts',
     'Claude Code losing context how to write prompts to preserve memory',
@@ -56,13 +51,12 @@ TOPICS = [
 
 embeddings = model.encode(TOPICS).tolist()
 collection.add(
-    documents=TOPICS,
-    embeddings=embeddings,
-    ids=[f'topic_{i}' for i in range(len(TOPICS))]
+    documents=TOPICS, embeddings=embeddings, ids=[f'topic_{i}' for i in range(len(TOPICS))]
 )
 
 # Raised threshold — only engage when clearly on-topic
 THRESHOLD = 0.44
+
 
 def is_relevant(post_text, threshold=THRESHOLD):
     embedding = model.encode([post_text]).tolist()

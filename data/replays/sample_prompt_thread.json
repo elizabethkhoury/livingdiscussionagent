@@ -1,0 +1,11 @@
+{
+  "candidate": {
+    "subreddit": "PromptEngineering",
+    "title": "Where do you save the prompts that actually work?",
+    "body": "I keep rewriting the same ChatGPT prompts because my notes app is a mess.",
+    "permalink": "https://reddit.com/r/PromptEngineering/comments/example"
+  },
+  "expected_route": "prompthunt.me",
+  "expected_decision": "queue_draft",
+  "expected_reason": "Direct prompt storage pain with explicit reuse problem."
+}

@@ -1,0 +1,26 @@
+{
+  "name": "dashboard",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "generate:client": "openapi-typescript http://localhost:8000/openapi.json -o src/lib/openapi.d.ts"
+  },
+  "dependencies": {
+    "next": "^16.2.3",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "9",
+    "eslint-config-next": "^16.2.3",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^6.0.2"
+  }
+}

@@ -15,13 +15,37 @@ PROFILE_DIR = os.path.join(os.path.dirname(__file__), 'chrome_profile')
 
 # Only subreddits where prompt/AI-output quality is genuinely discussed
 SUBREDDITS = [
-    'PromptEngineering', 'ChatGPTPromptEngineering', 'aipromptprogramming',
-    'promptdesign', 'ClaudeAI', 'ChatGPT', 'OpenAI', 'midjourney',
-    'StableDiffusion', 'AIAssistants', 'cursor', 'lovable', 'CursorAI',
-    'vibecoding', 'VibeCodingSaaS', 'vibecodersnest', 'vibecodedevs',
-    'nocode', 'nocodesaas', 'boltnewbuilders', 'base44', 'replit', 'Lovable',
-    'learnmachinelearning', 'learnprogramming', 'SideProject', 'sideprojects',
-    'microsaas', 'indiehackers', 'buildinpublic', 'solopreneur',
+    'PromptEngineering',
+    'ChatGPTPromptEngineering',
+    'aipromptprogramming',
+    'promptdesign',
+    'ClaudeAI',
+    'ChatGPT',
+    'OpenAI',
+    'midjourney',
+    'StableDiffusion',
+    'AIAssistants',
+    'cursor',
+    'lovable',
+    'CursorAI',
+    'vibecoding',
+    'VibeCodingSaaS',
+    'vibecodersnest',
+    'vibecodedevs',
+    'nocode',
+    'nocodesaas',
+    'boltnewbuilders',
+    'base44',
+    'replit',
+    'Lovable',
+    'learnmachinelearning',
+    'learnprogramming',
+    'SideProject',
+    'sideprojects',
+    'microsaas',
+    'indiehackers',
+    'buildinpublic',
+    'solopreneur',
 ]
 
 USER_AGENT = (
@@ -106,7 +130,7 @@ async def check_rate_limit(page):
             # Try to find the exact number of seconds Reddit wants us to wait
             match = re.search(r'wait\s+(\d+)\s+second', lower)
             wait_seconds = int(match.group(1)) if match else 120
-            total = wait_seconds + 30        # always overshoot by 30s
+            total = wait_seconds + 30  # always overshoot by 30s
             print(f'Rate limit detected — waiting {total}s (reddit asked for {wait_seconds}s)...')
             await asyncio.sleep(total)
             return True
@@ -119,23 +143,24 @@ async def get_new_posts(page, subreddit):
     posts = []
     try:
         await page.goto(
-            f'https://www.reddit.com/r/{subreddit}/new.json?limit=25',
-            wait_until='domcontentloaded'
+            f'https://www.reddit.com/r/{subreddit}/new.json?limit=25', wait_until='domcontentloaded'
         )
         await page.wait_for_timeout(2000)
         content = await page.inner_text('pre')
         data = json.loads(content)
         for post in data['data']['children']:
             p = post['data']
-            posts.append({
-                'id': p['id'],
-                'title': p['title'],
-                'body': p.get('selftext', ''),
-                'url': f"https://www.reddit.com{p['permalink']}",
-                'age_hours': (time.time() - p['created_utc']) / 3600,
-                'subreddit': subreddit,
-                'num_comments': p.get('num_comments', 0),
-            })
+            posts.append(
+                {
+                    'id': p['id'],
+                    'title': p['title'],
+                    'body': p.get('selftext', ''),
+                    'url': f'https://www.reddit.com{p["permalink"]}',
+                    'age_hours': (time.time() - p['created_utc']) / 3600,
+                    'subreddit': subreddit,
+                    'num_comments': p.get('num_comments', 0),
+                }
+            )
     except Exception as e:
         print(f'Error fetching r/{subreddit}: {str(e)[:50]}')
     return posts
@@ -154,11 +179,13 @@ async def get_comments(page, post_url):
                 body = c['data'].get('body', '')
                 author = c['data'].get('author', '')
                 if body and author != 'AutoModerator' and author != USERNAME and len(body) > 20:
-                    comments.append({
-                        'id': c['data'].get('id', ''),
-                        'body': body,
-                        'author': author,
-                    })
+                    comments.append(
+                        {
+                            'id': c['data'].get('id', ''),
+                            'body': body,
+                            'author': author,
+                        }
+                    )
     except Exception as e:
         print(f'Error getting comments: {str(e)[:60]}')
     return comments
@@ -168,6 +195,7 @@ async def get_comments(page, post_url):
 # Core posting helpers — rebuilt for reliability
 # ---------------------------------------------------------------------------
 
+
 async def _wait_for_editor(page, timeout_ms=8000):
     """
     Wait until at least one visible contenteditable exists and return its coords.
@@ -175,7 +203,7 @@ async def _wait_for_editor(page, timeout_ms=8000):
     """
     deadline = time.time() + timeout_ms / 1000
     while time.time() < deadline:
-        coords = await page.evaluate('''() => {
+        coords = await page.evaluate("""() => {
             // Reddit new UI keeps the editor inside a shadow root sometimes
             function findEditors(root) {
                 let results = [];
@@ -202,7 +230,7 @@ async def _wait_for_editor(page, timeout_ms=8000):
                 return results;
             }
             return findEditors(document);
-        }''')
+        }""")
         if coords:
             # pick the lowest one on screen (most likely to be the active composer)
             best = sorted(coords, key=lambda c: c['top'])[-1]
@@ -225,7 +253,7 @@ async def _open_post_composer(page):
         await page.evaluate(f'window.scrollTo(0, {scroll_y})')
         await page.wait_for_timeout(80)
 
-        clicked = await page.evaluate('''() => {
+        clicked = await page.evaluate("""() => {
             // "Join the conversation" placeholder div (new shreddit UI)
             const placeholders = Array.from(document.querySelectorAll(
                 'div[data-placeholder], [placeholder], textarea, ' +
@@ -251,7 +279,7 @@ async def _open_post_composer(page):
                 }
             }
             return null;
-        }''')
+        }""")
 
         if clicked:
             print(f'Clicked composer placeholder at scroll={scroll_y}')
@@ -298,7 +326,7 @@ async def _open_reply_composer(page):
         await page.evaluate(f'window.scrollTo(0, {scroll_y})')
         await page.wait_for_timeout(120)
 
-        clicked = await page.evaluate('''() => {
+        clicked = await page.evaluate("""() => {
             const buttons = Array.from(document.querySelectorAll('button'));
             for (const btn of buttons) {
                 const txt = (btn.innerText || btn.textContent || '').trim().toLowerCase();
@@ -311,7 +339,7 @@ async def _open_reply_composer(page):
                 }
             }
             return null;
-        }''')
+        }""")
 
         if clicked:
             print('Clicked Reply button')
@@ -351,14 +379,14 @@ async def _type_and_submit(page, editor_coords, text):
     await page.wait_for_timeout(800)
 
     # Verify something was typed
-    typed_len = await page.evaluate('''() => {
+    typed_len = await page.evaluate("""() => {
         const eds = document.querySelectorAll('[contenteditable="true"]');
         for (const ed of eds) {
             const t = ed.innerText || ed.textContent || '';
             if (t.trim().length > 5) return t.trim().length;
         }
         return 0;
-    }''')
+    }""")
     print(f'Characters in editor: {typed_len}')
 
     if typed_len == 0:
@@ -377,7 +405,7 @@ async def _type_and_submit(page, editor_coords, text):
     await page.wait_for_timeout(2000)
 
     # Belt-and-suspenders: also click the Comment / Save button if visible
-    btn_clicked = await page.evaluate('''() => {
+    btn_clicked = await page.evaluate("""() => {
         const buttons = Array.from(document.querySelectorAll('button'));
         for (const btn of buttons) {
             const t = (btn.innerText || btn.textContent || '').trim().toLowerCase();
@@ -390,7 +418,7 @@ async def _type_and_submit(page, editor_coords, text):
             }
         }
         return null;
-    }''')
+    }""")
     if btn_clicked:
         print(f'Also clicked "{btn_clicked}" button')
 
@@ -436,23 +464,59 @@ async def post_comment(page, post_url, reply_text, is_reply_to_comment=False):
 
 # Hard keyword gate: post must contain at least one of these to even be considered
 PROMPT_KEYWORDS = [
-    'prompt', 'prompts', 'prompting', 'system prompt', 'context window',
-    'tokens', 'token limit', 'ai output', 'ai outputs', 'llm output',
-    'getting better results', 'consistent results', 'inconsistent',
-    'cursor', 'lovable', 'claude', 'chatgpt', 'gpt-4', 'gpt4',
-    'midjourney', 'stable diffusion', 'vibe cod',
-    'save my prompts', 'reuse prompts', 'losing prompts', 'prompt library',
-    'prompt template', 'prompt bank',
+    'prompt',
+    'prompts',
+    'prompting',
+    'system prompt',
+    'context window',
+    'tokens',
+    'token limit',
+    'ai output',
+    'ai outputs',
+    'llm output',
+    'getting better results',
+    'consistent results',
+    'inconsistent',
+    'cursor',
+    'lovable',
+    'claude',
+    'chatgpt',
+    'gpt-4',
+    'gpt4',
+    'midjourney',
+    'stable diffusion',
+    'vibe cod',
+    'save my prompts',
+    'reuse prompts',
+    'losing prompts',
+    'prompt library',
+    'prompt template',
+    'prompt bank',
 ]
 
 # Posts matching these are almost certainly NOT about prompting — hard reject
 ANTI_KEYWORDS = [
-    'hiring', 'job posting', 'salary', 'looking for work', 'resume',
-    'stock price', 'acquisition', 'lawsuit', 'terms of service',
-    'data breach', 'privacy policy', 'earnings report',
-    'how do i invest', 'crypto', 'nft',
-    'motivational', 'just shipped', 'i built a', 'launched my',
-    'show hn', 'feedback on my',
+    'hiring',
+    'job posting',
+    'salary',
+    'looking for work',
+    'resume',
+    'stock price',
+    'acquisition',
+    'lawsuit',
+    'terms of service',
+    'data breach',
+    'privacy policy',
+    'earnings report',
+    'how do i invest',
+    'crypto',
+    'nft',
+    'motivational',
+    'just shipped',
+    'i built a',
+    'launched my',
+    'show hn',
+    'feedback on my',
 ]
 
 
@@ -528,6 +592,7 @@ async def process_post(page, post):
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
+
 
 async def run():
     while True:
