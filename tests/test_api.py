@@ -1,6 +1,7 @@
 import os
 
 os.environ['DATABASE_URL'] = 'sqlite+aiosqlite:///./test_agent.sqlite3'
+os.environ['LLM_MODE'] = 'mock'
 
 from fastapi.testclient import TestClient
 

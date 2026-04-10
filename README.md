@@ -15,7 +15,7 @@ Compliance-first Reddit opportunity agent that discovers high-signal threads thr
 
 ## Quick start
 
-1. Copy `.env.example` to `.env` and fill in Kernel, browser-agent, and analytics credentials.
+1. Copy `.env.example` to `.env` and fill in OpenAI, Kernel, browser-agent, and analytics credentials.
 2. Start local infra:
 
 ```bash
@@ -29,6 +29,14 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
+
+OpenAI-backed runtime defaults:
+
+- `LLM_MODE=openai`
+- `GENERATION_MODEL=gpt-5.4`
+- `EVALUATOR_MODEL=gpt-5.4-mini`
+- `OPENAI_API_KEY` is used for drafting, evaluation, and critic passes
+- `BROWSER_AGENT_API_KEY` / `BROWSER_AGENT_BASE_URL` remain optional overrides for browser recovery and otherwise fall back to the OpenAI settings
 
 4. Start the API:
 

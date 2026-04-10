@@ -26,10 +26,11 @@ class RedditBrowserAgent:
 
         kwargs = {
             'model': self.settings.browser_agent_model,
-            'api_key': self.settings.browser_agent_api_key,
+            'api_key': self.settings.browser_agent_api_key or self.settings.openai_api_key,
         }
-        if self.settings.browser_agent_base_url:
-            kwargs['base_url'] = self.settings.browser_agent_base_url
+        base_url = self.settings.browser_agent_base_url or self.settings.openai_base_url
+        if base_url:
+            kwargs['base_url'] = base_url
         return ChatOpenAI(**kwargs)
 
     async def recover(self, *, cdp_ws_url: str, task: str):
