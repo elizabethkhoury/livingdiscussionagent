@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<section>
+  <h1>Post Attempts</h1>
+  <table>
+    <thead><tr><th>ID</th><th>Draft</th><th>Status</th><th>Transport</th><th>Posted Comment</th><th>Error</th></tr></thead>
+    <tbody>
+      {% for attempt in attempts %}
+      <tr>
+        <td>{{ attempt.id }}</td>
+        <td>{{ attempt.draft_id }}</td>
+        <td>{{ attempt.status }}</td>
+        <td>{{ attempt.transport }}</td>
+        <td>{{ attempt.posted_comment_id or "-" }}</td>
+        <td>{{ attempt.error_message or "-" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
+

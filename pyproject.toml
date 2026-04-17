@@ -1,0 +1,34 @@
+[project]
+name = "prompthunt-reddit-agent"
+version = "0.1.0"
+description = "Reddit-first modular recommendation agent for PromptHunt."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.0",
+  "jinja2>=3.1.4",
+  "playwright>=1.51.0",
+  "pydantic>=2.9.0",
+  "pydantic-settings>=2.6.0",
+  "psycopg[binary]>=3.2.3",
+  "python-dotenv>=1.0.1",
+  "sqlalchemy>=2.0.36",
+  "uvicorn>=0.32.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "alembic>=1.14.0",
+  "pytest>=8.3.0",
+  "ruff>=0.8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 180
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

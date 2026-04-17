@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+      body { font-family: sans-serif; margin: 2rem; background: #fafafa; color: #111; }
+      a { color: #0b57d0; text-decoration: none; }
+      nav { display: flex; gap: 1rem; margin-bottom: 2rem; }
+      article, section { background: white; padding: 1rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+      textarea { width: 100%; min-height: 12rem; }
+      code, pre { background: #f3f3f3; padding: 0.2rem 0.4rem; border-radius: 6px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 0.6rem; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+      .pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; background: #eef2ff; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/reviews">Reviews</a>
+      <a href="/attempts">Attempts</a>
+      <a href="/learning">Learning</a>
+      <a href="/settings">Settings</a>
+    </nav>
+    {% block content %}{% endblock %}
+  </body>
+</html>
+

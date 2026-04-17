@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<section>
+  <h1>Learning</h1>
+  <h2>Strategy Weights</h2>
+  <pre>{{ weights }}</pre>
+  <h2>Latest Threshold Event</h2>
+  <pre>{{ threshold_event.payload_json if threshold_event else {} }}</pre>
+</section>
+{% endblock %}
+

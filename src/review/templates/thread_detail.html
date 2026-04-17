@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<article>
+  <h1>{{ thread.title }}</h1>
+  <p><strong>Subreddit:</strong> {{ thread.subreddit }}</p>
+  <p><strong>Author:</strong> {{ thread.author }}</p>
+  <p><strong>URL:</strong> <a href="{{ thread.url }}">{{ thread.url }}</a></p>
+  <pre>{{ thread.body }}</pre>
+</article>
+{% endblock %}
+

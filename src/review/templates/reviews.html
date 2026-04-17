@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<section>
+  <h1>Pending Reviews</h1>
+  <table>
+    <thead><tr><th>ID</th><th>Draft</th><th>Reason</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for review in reviews %}
+      <tr>
+        <td><a href="/reviews/{{ review.id }}">{{ review.id }}</a></td>
+        <td>{{ review.draft_id }}</td>
+        <td>{{ review.review_reason }}</td>
+        <td><span class="pill">{{ review.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
+

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<article>
+  <h1>Review {{ review.id }}</h1>
+  <p><strong>Status:</strong> {{ review.status }}</p>
+  <p><strong>Reason:</strong> {{ review.review_reason }}</p>
+  <p><strong>Draft ID:</strong> {{ draft.id }}</p>
+  <p><strong>Strategy:</strong> {{ draft.strategy }}</p>
+  <p><strong>Disclosure:</strong> {{ draft.disclosure_text or "none" }}</p>
+</article>
+<section>
+  <h2>Draft Body</h2>
+  <form method="post" action="/reviews/{{ review.id }}/edit-and-approve">
+    <textarea name="body">{{ draft.body }}</textarea>
+    <p><input name="note" placeholder="Reviewer note"></p>
+    <button type="submit">Edit and approve</button>
+  </form>
+</section>
+<section>
+  <form method="post" action="/reviews/{{ review.id }}/approve">
+    <input name="note" placeholder="Approval note">
+    <button type="submit">Approve</button>
+  </form>
+</section>
+<section>
+  <form method="post" action="/reviews/{{ review.id }}/reject">
+    <input name="note" placeholder="Rejection note">
+    <button type="submit">Reject</button>
+  </form>
+</section>
+{% endblock %}
+
