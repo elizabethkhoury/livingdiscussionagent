@@ -12,4 +12,3 @@ DEFAULT_RULES = {
 
 def subreddit_policy(subreddit: str):
     return DEFAULT_RULES.get(subreddit, SubredditPromoPolicy.ALLOW)
-

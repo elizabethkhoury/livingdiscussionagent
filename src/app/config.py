@@ -9,4 +9,3 @@ def get_default_thresholds():
         value_add_threshold=settings.value_add_threshold_default,
         autopost_overall_threshold=settings.autopost_overall_threshold_default,
     )
-

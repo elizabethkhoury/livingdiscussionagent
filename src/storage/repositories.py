@@ -15,11 +15,7 @@ class ThreadRepository:
         self.session = session
 
     def upsert_thread(self, thread_context):
-        record = self.session.scalar(
-            select(schema.ThreadRecord).where(
-                schema.ThreadRecord.platform_thread_id == thread_context.post.platform_thread_id
-            )
-        )
+        record = self.session.scalar(select(schema.ThreadRecord).where(schema.ThreadRecord.platform_thread_id == thread_context.post.platform_thread_id))
         if record is None:
             record = schema.ThreadRecord(
                 platform_thread_id=thread_context.post.platform_thread_id,
@@ -34,11 +30,7 @@ class ThreadRepository:
             self.session.add(record)
             self.session.flush()
         for comment in thread_context.comments:
-            existing_comment = self.session.scalar(
-                select(schema.ThreadCommentRecord).where(
-                    schema.ThreadCommentRecord.platform_comment_id == comment.platform_comment_id
-                )
-            )
+            existing_comment = self.session.scalar(select(schema.ThreadCommentRecord).where(schema.ThreadCommentRecord.platform_comment_id == comment.platform_comment_id))
             if existing_comment is None:
                 self.session.add(
                     schema.ThreadCommentRecord(
@@ -53,9 +45,7 @@ class ThreadRepository:
         return record
 
     def get_thread_by_platform_id(self, platform_thread_id: str):
-        return self.session.scalar(
-            select(schema.ThreadRecord).where(schema.ThreadRecord.platform_thread_id == platform_thread_id)
-        )
+        return self.session.scalar(select(schema.ThreadRecord).where(schema.ThreadRecord.platform_thread_id == platform_thread_id))
 
     def posted_thread_ids(self, lookback_days: int = 14):
         cutoff = datetime.utcnow() - timedelta(days=lookback_days)
@@ -93,9 +83,7 @@ class ThreadRepository:
         return self.session.scalar(stmt) or 0
 
     def count_posts_since(self, since: datetime):
-        stmt = select(func.count(schema.PostAttemptRecord.id)).where(
-            schema.PostAttemptRecord.posted_at >= since
-        )
+        stmt = select(func.count(schema.PostAttemptRecord.id)).where(schema.PostAttemptRecord.posted_at >= since)
         return self.session.scalar(stmt) or 0
 
 
@@ -157,12 +145,16 @@ class DecisionRepository:
         return record
 
     def queue_review(self, draft_id: int, reason: str):
+        draft = self.session.get(schema.DraftRecord, draft_id)
+        if draft is None:
+            raise ValueError(f"Unknown draft {draft_id}")
         record = schema.ReviewRecord(
             draft_id=draft_id,
             status="pending",
             review_reason=reason,
         )
         self.session.add(record)
+        draft.status = DraftStatus.QUEUED.value
         self.session.flush()
         return record
 
@@ -284,9 +276,5 @@ class LearningRepository:
         return record
 
     def latest_threshold_event(self):
-        stmt = (
-            select(schema.SystemEventRecord)
-            .where(schema.SystemEventRecord.event_type == "threshold_update")
-            .order_by(desc(schema.SystemEventRecord.id))
-        )
+        stmt = select(schema.SystemEventRecord).where(schema.SystemEventRecord.event_type == "threshold_update").order_by(desc(schema.SystemEventRecord.id))
         return self.session.scalar(stmt)

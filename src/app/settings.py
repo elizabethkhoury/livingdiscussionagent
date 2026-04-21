@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_SUBREDDITS = [
     "PromptEngineering",
-    "ChatGPTPromptEngineering",
     "aipromptprogramming",
     "promptdesign",
     "ClaudeAI",
@@ -13,7 +12,6 @@ DEFAULT_SUBREDDITS = [
     "OpenAI",
     "midjourney",
     "StableDiffusion",
-    "AIAssistants",
     "cursor",
     "lovable",
     "CursorAI",

@@ -49,4 +49,3 @@ class OutcomeMonitor(Protocol):
 
 class LearningService(Protocol):
     def update(self) -> LearningUpdateReport: ...
-

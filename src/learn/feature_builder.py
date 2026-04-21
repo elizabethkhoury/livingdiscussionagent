@@ -20,4 +20,3 @@ def default_strategy_weights():
         ResponseStrategy.EXPERIENTIAL.value: 1.0,
         ResponseStrategy.RESOURCE_LINKING.value: 1.0,
     }
-

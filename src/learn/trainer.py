@@ -26,9 +26,7 @@ class LearningTrainer:
             thresholds = {
                 "relevance_threshold": tune_threshold(defaults.relevance_threshold, direction, 0.60, 0.72),
                 "value_add_threshold": tune_threshold(defaults.value_add_threshold, direction, 0.65, 0.80),
-                "autopost_overall_threshold": tune_threshold(
-                    defaults.autopost_overall_threshold, direction, 0.78, 0.86
-                ),
+                "autopost_overall_threshold": tune_threshold(defaults.autopost_overall_threshold, direction, 0.78, 0.86),
             }
             weights = learning.latest_strategy_weights() or default_strategy_weights()
             weight_direction = 0.05 if avg_reward > 0.5 else -0.05

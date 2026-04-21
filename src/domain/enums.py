@@ -81,4 +81,3 @@ class AttemptStatus(StrEnum):
     PENDING = "pending"
     POSTED = "posted"
     FAILED = "failed"
-

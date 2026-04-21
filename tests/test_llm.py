@@ -26,7 +26,7 @@ class DummyResponse:
 @pytest.fixture(autouse=True)
 def clear_settings_cache(monkeypatch: pytest.MonkeyPatch):
     get_settings.cache_clear()
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.delenv("OPENAI_MODEL", raising=False)
     yield
     get_settings.cache_clear()

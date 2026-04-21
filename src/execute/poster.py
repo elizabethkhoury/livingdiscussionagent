@@ -26,9 +26,7 @@ class PostingService:
                 return False, CircuitBreakerState(failure_events=["hourly_cap"])
             if threads.count_posts_since(datetime.utcnow() - timedelta(days=1)) >= self.settings.max_total_posts_per_day:
                 return False, CircuitBreakerState(failure_events=["daily_cap"])
-            if threads.count_posts_for_subreddit_since(
-                subreddit, datetime.utcnow() - timedelta(days=1)
-            ) >= self.settings.subreddit_daily_cap:
+            if threads.count_posts_for_subreddit_since(subreddit, datetime.utcnow() - timedelta(days=1)) >= self.settings.subreddit_daily_cap:
                 return False, CircuitBreakerState(failure_events=["subreddit_daily_cap"])
         return True, CircuitBreakerState()
 

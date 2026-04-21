@@ -14,4 +14,3 @@ class ValueAddClassifier:
         if thread.target_comment:
             score += 0.05
         return max(0.0, min(score, 1.0))
-

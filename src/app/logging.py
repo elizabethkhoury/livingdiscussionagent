@@ -6,4 +6,3 @@ def configure_logging():
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
-

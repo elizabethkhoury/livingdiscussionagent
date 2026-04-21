@@ -46,4 +46,3 @@ class DraftEvaluator:
             overall_score=overall,
             fail_reasons=fail_reasons,
         )
-

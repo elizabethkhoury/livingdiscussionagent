@@ -170,4 +170,3 @@ class SystemEventRecord(Base):
     event_type: Mapped[str] = mapped_column(String(128), index=True)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=datetime.utcnow)
-

@@ -162,4 +162,3 @@ class CircuitBreakerState:
     rate_limits: int = 0
     blocked_until: datetime | None = None
     failure_events: list[str] = field(default_factory=list)
-

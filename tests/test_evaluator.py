@@ -43,4 +43,3 @@ def test_neutral_information_stays_eligible():
     evaluation = DraftEvaluator().evaluate(make_thread(), draft)
     assert evaluation.overall_score > 0.75
     assert evaluation.fail_reasons == []
-

@@ -48,19 +48,12 @@ def make_decision(promotion_mode: PromotionMode):
 
 
 def test_compose_uses_llm_output_when_candidate_is_safe():
-    writer = DraftWriter(
-        StubLLMClient(
-            "A practical fix is to store each prompt with the model, result notes, and reuse context so you can find proven versions quickly."
-        )
-    )
+    writer = DraftWriter(StubLLMClient("A practical fix is to store each prompt with the model, result notes, and reuse context so you can find proven versions quickly."))
 
     draft = writer.compose(make_thread(), make_decision(PromotionMode.NONE))
 
     assert draft is not None
-    assert (
-        draft.body
-        == "A practical fix is to store each prompt with the model, result notes, and reuse context so you can find proven versions quickly."
-    )
+    assert draft.body == "A practical fix is to store each prompt with the model, result notes, and reuse context so you can find proven versions quickly."
     assert draft.autopost_eligible is True
     assert draft.disclosure_text is None
 
@@ -76,11 +69,7 @@ def test_compose_falls_back_to_heuristic_when_llm_fails():
 
 
 def test_compose_appends_disclosure_for_monetized_mode():
-    writer = DraftWriter(
-        StubLLMClient(
-            "A good next step is to save prompts with outcome notes so you can compare versions and keep the useful ones."
-        )
-    )
+    writer = DraftWriter(StubLLMClient("A good next step is to save prompts with outcome notes so you can compare versions and keep the useful ones."))
 
     draft = writer.compose(make_thread(), make_decision(PromotionMode.DISCLOSED_MONETIZED))
 
@@ -91,11 +80,7 @@ def test_compose_appends_disclosure_for_monetized_mode():
 
 
 def test_compose_keeps_plain_mention_mode_without_disclosure():
-    writer = DraftWriter(
-        StubLLMClient(
-            "A useful way to handle this is to keep your best prompts with notes, and a tool like PromptHunt can help if you want a shared library."
-        )
-    )
+    writer = DraftWriter(StubLLMClient("A useful way to handle this is to keep your best prompts with notes, and a tool like PromptHunt can help if you want a shared library."))
 
     draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
 
@@ -119,9 +104,7 @@ def test_compose_returns_none_for_skip():
 
 def test_generated_safe_reply_passes_evaluator():
     writer = DraftWriter(
-        StubLLMClient(
-            "A practical next step is to save each prompt with the model, the output quality notes, and when it worked so reuse becomes deliberate instead of guesswork."
-        )
+        StubLLMClient("A practical next step is to save each prompt with the model, the output quality notes, and when it worked so reuse becomes deliberate instead of guesswork.")
     )
 
     draft = writer.compose(make_thread(), make_decision(PromotionMode.NONE))

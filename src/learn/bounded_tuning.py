@@ -7,4 +7,3 @@ def clamp(value: float, minimum: float, maximum: float):
 
 def tune_threshold(current: float, direction: float, minimum: float, maximum: float):
     return clamp(round(current + direction, 2), minimum, maximum)
-

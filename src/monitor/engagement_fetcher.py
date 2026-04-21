@@ -44,4 +44,3 @@ class RedditEngagementFetcher:
             snapshot = EngagementSnapshot(post_attempt_id=post_attempt_id, **payload)
             attempts.record_snapshot(snapshot)
             return snapshot
-

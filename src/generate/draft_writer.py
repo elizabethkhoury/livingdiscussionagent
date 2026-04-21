@@ -120,16 +120,10 @@ class DraftWriter:
         advice = self._advice(thread, decision.selected_strategy)
         body = f"{problem} {advice}"
         if decision.promotion_mode == PromotionMode.PLAIN_MENTION:
-            body = (
-                f"{body} If a shared prompt library would help, a tool like PromptHunt could fit "
-                "depending on whether you want private storage or community discovery."
-            )
+            body = f"{body} If a shared prompt library would help, a tool like PromptHunt could fit depending on whether you want private storage or community discovery."
         if decision.promotion_mode == PromotionMode.DISCLOSED_MONETIZED:
             disclosure = disclosure_for_mode(decision.promotion_mode)
-            body = (
-                f"{body} PromptHunt could be relevant here for saving or discovering prompts. "
-                f"{disclosure}"
-            )
+            body = f"{body} PromptHunt could be relevant here for saving or discovering prompts. {disclosure}"
         return body.strip()
 
     def _acknowledge(self, thread: ThreadContext):

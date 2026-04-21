@@ -66,4 +66,3 @@ def test_deny_policy_blocks_promo_but_not_info():
         make_classification(subreddit_promo_policy=SubredditPromoPolicy.DENY),
     )
     assert decision.promotion_mode.value == "none"
-

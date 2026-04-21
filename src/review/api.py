@@ -19,14 +19,19 @@ def create_review_app():
     app = FastAPI(title="PromptHunt Review Dashboard")
     reviews = ReviewService()
 
+    @app.get("/", include_in_schema=False)
+    def dashboard_root():
+        return RedirectResponse(url="/reviews", status_code=307)
+
     @app.get("/reviews", response_class=HTMLResponse)
     def list_reviews(request: Request):
         with session_scope() as session:
             repo = DecisionRepository(session)
             items = repo.list_pending_reviews()
         return templates.TemplateResponse(
+            request,
             "reviews.html",
-            {"request": request, "reviews": items, "title": "Pending Reviews"},
+            {"reviews": items, "title": "Pending Reviews"},
         )
 
     @app.get("/reviews/{review_id}", response_class=HTMLResponse)
@@ -38,8 +43,9 @@ def create_review_app():
                 raise HTTPException(status_code=404, detail="Review not found")
             draft = repo.get_draft(review.draft_id)
         return templates.TemplateResponse(
+            request,
             "review_detail.html",
-            {"request": request, "review": review, "draft": draft, "title": f"Review {review_id}"},
+            {"review": review, "draft": draft, "title": f"Review {review_id}"},
         )
 
     @app.post("/reviews/{review_id}/approve")
@@ -63,8 +69,9 @@ def create_review_app():
             repo = DecisionRepository(session)
             attempts = repo.get_attempts()
         return templates.TemplateResponse(
+            request,
             "attempts.html",
-            {"request": request, "attempts": attempts, "title": "Post Attempts"},
+            {"attempts": attempts, "title": "Post Attempts"},
         )
 
     @app.get("/threads/{reddit_thread_id}", response_class=HTMLResponse)
@@ -75,8 +82,9 @@ def create_review_app():
             if thread is None:
                 raise HTTPException(status_code=404, detail="Thread not found")
         return templates.TemplateResponse(
+            request,
             "thread_detail.html",
-            {"request": request, "thread": thread, "title": f"Thread {reddit_thread_id}"},
+            {"thread": thread, "title": f"Thread {reddit_thread_id}"},
         )
 
     @app.get("/learning", response_class=HTMLResponse)
@@ -86,16 +94,18 @@ def create_review_app():
             weights = repo.latest_strategy_weights()
             threshold_event = repo.latest_threshold_event()
         return templates.TemplateResponse(
+            request,
             "learning.html",
-            {"request": request, "weights": weights, "threshold_event": threshold_event, "title": "Learning"},
+            {"weights": weights, "threshold_event": threshold_event, "title": "Learning"},
         )
 
     @app.get("/settings", response_class=HTMLResponse)
     def settings_dashboard(request: Request):
         settings = get_settings()
         return templates.TemplateResponse(
+            request,
             "settings.html",
-            {"request": request, "settings": settings.model_dump(), "title": "Settings"},
+            {"settings": settings.model_dump(), "title": "Settings"},
         )
 
     return app

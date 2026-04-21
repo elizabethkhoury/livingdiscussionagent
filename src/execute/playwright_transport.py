@@ -13,11 +13,7 @@ from src.domain.models import PostAttempt
 from src.storage.db import session_scope
 from src.storage.repositories import DecisionRepository, LearningRepository
 
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/124.0.0.0 Safari/537.36"
-)
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 
 class PlaywrightPostingTransport:
@@ -228,4 +224,3 @@ class PlaywrightPostingTransport:
         if not editor:
             return False
         return await self._type_and_submit(page, editor, reply_text)
-

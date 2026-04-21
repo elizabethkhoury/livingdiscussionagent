@@ -10,4 +10,3 @@ class StrategySelector:
         if intent == IntentType.COMPLAINT.value:
             return ResponseStrategy.EXPERIENTIAL
         return ResponseStrategy.EDUCATIONAL
-

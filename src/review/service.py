@@ -14,7 +14,6 @@ class ReviewService:
         with session_scope() as session:
             decisions = DecisionRepository(session)
             review = decisions.queue_review(draft_id, reason)
-            decisions.set_draft_status(draft_id, DraftStatus.QUEUED.value)
             return ReviewItem(
                 review_id=review.id,
                 draft_id=review.draft_id,
@@ -51,4 +50,3 @@ class ReviewService:
                 draft.status = DraftStatus.REJECTED.value
             session.flush()
             return review
-

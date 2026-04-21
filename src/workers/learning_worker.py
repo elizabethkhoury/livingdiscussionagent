@@ -7,4 +7,3 @@ class LearningWorker:
 
     def run_once(self):
         return self.trainer.update()
-

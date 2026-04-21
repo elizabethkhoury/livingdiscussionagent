@@ -11,4 +11,3 @@ class CommercialFitClassifier:
         if any(token in text for token in ["tool", "tools", "workflow", "save prompts", "prompt repo"]):
             return 0.61, CommercialOpportunity.MEDIUM
         return 0.2, CommercialOpportunity.LOW
-

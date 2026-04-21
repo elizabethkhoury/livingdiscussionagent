@@ -20,4 +20,3 @@ class IntentClassifier:
         if any(token in text for token in ["news", "announced", "update"]):
             return IntentType.NEWS, Tone.NEUTRAL
         return IntentType.DISCUSSION, Tone.NEUTRAL
-

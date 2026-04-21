@@ -9,4 +9,3 @@ def classify_negative_signal(snapshot: EngagementSnapshot):
     if snapshot.score < 0:
         return "strong_negative_reply_signal"
     return "healthy"
-

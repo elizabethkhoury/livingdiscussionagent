@@ -9,7 +9,6 @@ from src.generate.draft_writer import DraftWriter
 from src.generate.evaluators import DraftEvaluator
 from src.ingest.candidate_selector import CandidateSelector
 from src.ingest.reddit_reader import RedditJSONReader
-from src.review.service import ReviewService
 from src.storage.db import session_scope
 from src.storage.repositories import DecisionRepository, ThreadRepository
 
@@ -34,9 +33,7 @@ class IngestWorker:
                     threads = ThreadRepository(session)
                     prior_bodies = threads.recent_post_bodies()
                 classifier = ClassificationPipeline(
-                    duplicate_similarity_lookup=lambda candidate, prior_bodies=tuple(prior_bodies): self._duplicate_similarity(
-                        candidate.combined_text, list(prior_bodies)
-                    )
+                    duplicate_similarity_lookup=lambda candidate, prior_bodies=tuple(prior_bodies): self._duplicate_similarity(candidate.combined_text, list(prior_bodies))
                 )
                 for candidate in self.selector.select(full_thread):
                     classification = classifier.classify(candidate)
@@ -62,11 +59,7 @@ class IngestWorker:
             thread_record = threads.upsert_thread(candidate)
             target_comment_id = None
             if candidate.target_comment:
-                target_comment = next(
-                    comment
-                    for comment in thread_record.comments
-                    if comment.platform_comment_id == candidate.target_comment.platform_comment_id
-                )
+                target_comment = next(comment for comment in thread_record.comments if comment.platform_comment_id == candidate.target_comment.platform_comment_id)
                 target_comment_id = target_comment.id
             classification_record = decisions.create_classification(thread_record.id, target_comment_id, classification)
             decision_record = decisions.create_decision(classification_record.id, decision)
@@ -74,11 +67,11 @@ class IngestWorker:
                 return {"thread_id": thread_record.id, "action": decision.action.value, "draft_id": None}
             draft_record = decisions.create_draft(decision_record.id, draft)
             if decision.requires_review:
-                review = ReviewService().enqueue(draft_record.id, ",".join(decision.trace.reason_codes))
+                review = decisions.queue_review(draft_record.id, ",".join(decision.trace.reason_codes))
                 return {
                     "thread_id": thread_record.id,
                     "action": decision.action.value,
                     "draft_id": draft_record.id,
-                    "review_id": review.review_id,
+                    "review_id": review.id,
                 }
             return {"thread_id": thread_record.id, "action": decision.action.value, "draft_id": draft_record.id}

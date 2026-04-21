@@ -55,4 +55,3 @@ class MonitorWorker:
             - (0.40 * negative),
             3,
         )
-

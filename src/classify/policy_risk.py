@@ -26,4 +26,3 @@ class PolicyRiskClassifier:
         if thread.post.age_hours > 24:
             score += 0.1
         return min(score, 1.0)
-
