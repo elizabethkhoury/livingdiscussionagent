@@ -18,7 +18,7 @@ Reddit-first recommendation agent for PromptHunt. It ingests threads from config
 - PostgreSQL
 - Chromium dependencies needed by Playwright
 - A Reddit account if you want to post through the Playwright transport
-- A Mistral API key if you want real LLM generations instead of the heuristic fallback
+- An OpenAI API key if you want live LLM generations instead of the heuristic fallback
 
 ## Local Setup
 
@@ -62,8 +62,8 @@ APP_PORT=8000
 
 POSTGRES_DSN=postgresql+psycopg://localhost/prompthunt
 
-LLM_PROVIDER=mistral
-MISTRAL_API_KEY=your-mistral-api-key
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-5-mini
 
 REDDIT_USERNAME=your-reddit-username
 REDDIT_PASSWORD=your-reddit-password
@@ -75,7 +75,7 @@ AUTOPOST_ENABLED=false
 
 Notes:
 
-- If `MISTRAL_API_KEY` is missing, the app falls back to a heuristic LLM client.
+- If `OPENAI_API_KEY` is missing, the app falls back to a heuristic draft generator.
 - Reddit credentials are only required for Playwright posting.
 - `AUTOPOST_ENABLED=false` is a safer default for local setup while you validate the pipeline.
 
@@ -152,8 +152,8 @@ These are the main settings defined in `src/app/settings.py`:
 | `APP_HOST` | `127.0.0.1` | Dashboard bind host |
 | `APP_PORT` | `8000` | Dashboard bind port |
 | `POSTGRES_DSN` | `postgresql+psycopg://localhost/prompthunt` | SQLAlchemy connection string |
-| `LLM_PROVIDER` | `mistral` | LLM backend selector |
-| `MISTRAL_API_KEY` | unset | Required for live Mistral API calls |
+| `OPENAI_API_KEY` | unset | Required for live OpenAI Responses API calls |
+| `OPENAI_MODEL` | `gpt-5-mini` | Default OpenAI model used for draft generation |
 | `REDDIT_USERNAME` | unset | Reddit login for Playwright posting |
 | `REDDIT_PASSWORD` | unset | Reddit login for Playwright posting |
 | `CHROME_PROFILE_DIR` | `chrome_profile` | Persistent browser profile path |
@@ -188,7 +188,7 @@ Check:
 
 ### LLM output looks too literal or weak
 
-That usually means the code is using the heuristic fallback because `MISTRAL_API_KEY` is missing or invalid.
+That usually means the code is using the heuristic fallback because `OPENAI_API_KEY` is missing or invalid, or the OpenAI request failed and the draft writer fell back to the built-in heuristic reply.
 
 ### Reddit posting is risky in local development
 

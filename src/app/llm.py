@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from typing import Any
 from urllib import request
 
 from src.app.settings import get_settings
@@ -23,20 +24,27 @@ class HeuristicLLMClient(LLMClient):
         return messages[-1].content
 
 
-class MistralLLMClient(LLMClient):
-    def __init__(self, api_key: str):
+class OpenAILLMClient(LLMClient):
+    def __init__(self, api_key: str, model: str):
         self.api_key = api_key
+        self.model = model
 
     def complete(self, messages: list[LLMMessage], temperature: float = 0.2) -> str:
         payload = json.dumps(
             {
-                "model": "mistral-small-latest",
+                "model": self.model,
                 "temperature": temperature,
-                "messages": [{"role": item.role, "content": item.content} for item in messages],
+                "input": [
+                    {
+                        "role": item.role,
+                        "content": [{"type": "input_text", "text": item.content}],
+                    }
+                    for item in messages
+                ],
             }
         ).encode("utf-8")
         req = request.Request(
-            url="https://api.mistral.ai/v1/chat/completions",
+            url="https://api.openai.com/v1/responses",
             data=payload,
             headers={
                 "Authorization": f"Bearer {self.api_key}",
@@ -46,12 +54,25 @@ class MistralLLMClient(LLMClient):
         )
         with request.urlopen(req, timeout=30) as response:
             body = json.loads(response.read().decode("utf-8"))
-        return body["choices"][0]["message"]["content"].strip()
+        return _extract_output_text(body)
+
+
+def _extract_output_text(response_body: dict[str, Any]) -> str:
+    text_parts: list[str] = []
+    for item in response_body.get("output", []):
+        if item.get("type") != "message":
+            continue
+        for content_item in item.get("content", []):
+            content_type = content_item.get("type")
+            if content_type in {"output_text", "text"}:
+                text = content_item.get("text")
+                if isinstance(text, str) and text.strip():
+                    text_parts.append(text.strip())
+    return "\n".join(text_parts).strip()
 
 
 def get_llm_client():
     settings = get_settings()
-    if settings.llm_provider == "mistral" and settings.llm_api_key:
-        return MistralLLMClient(settings.llm_api_key)
+    if settings.openai_api_key:
+        return OpenAILLMClient(settings.openai_api_key, settings.llm_model)
     return HeuristicLLMClient()
-

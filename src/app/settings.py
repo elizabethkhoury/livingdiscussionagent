@@ -46,8 +46,8 @@ class AppSettings(BaseSettings):
     app_port: int = 8000
     dashboard_auth_secret: str = "local-dev-secret"
     autopost_enabled: bool = True
-    llm_provider: str = "mistral"
-    llm_api_key: str | None = Field(default=None, alias="MISTRAL_API_KEY")
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    llm_model: str = Field(default="gpt-5-mini", alias="OPENAI_MODEL")
     postgres_dsn: str = "postgresql+psycopg://localhost/prompthunt"
     reddit_username: str | None = Field(default=None, alias="REDDIT_USERNAME")
     reddit_password: str | None = Field(default=None, alias="REDDIT_PASSWORD")
@@ -77,4 +77,3 @@ class AppSettings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings():
     return AppSettings()
-
