@@ -58,6 +58,8 @@ src/workers/learning_worker.py
 src/workers/monitor_worker.py
 src/workers/review_worker.py
 tests/test_decision_engine.py
+tests/test_draft_writer.py
 tests/test_evaluator.py
 tests/test_learning.py
+tests/test_llm.py
 tests/test_policies.py

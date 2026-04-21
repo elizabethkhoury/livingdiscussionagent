@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_SUBREDDITS = [
@@ -72,6 +72,15 @@ class AppSettings(BaseSettings):
     relevance_threshold_default: float = 0.65
     value_add_threshold_default: float = 0.70
     autopost_overall_threshold_default: float = 0.80
+
+    @field_validator("postgres_dsn", mode="before")
+    @classmethod
+    def normalize_postgres_dsn(cls, value: str):
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+psycopg://", 1)
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+        return value
 
 
 @lru_cache(maxsize=1)
