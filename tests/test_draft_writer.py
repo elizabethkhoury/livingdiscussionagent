@@ -10,12 +10,12 @@ class StubLLMClient:
     def __init__(self, response: str):
         self.response = response
 
-    def complete(self, messages, temperature: float = 0.2):
+    def complete(self, messages):
         return self.response
 
 
 class FailingLLMClient:
-    def complete(self, messages, temperature: float = 0.2):
+    def complete(self, messages):
         raise RuntimeError("boom")
 
 
@@ -66,6 +66,24 @@ def test_compose_falls_back_to_heuristic_when_llm_fails():
     assert draft is not None
     assert "PromptHunt could fit" in draft.body
     assert draft.disclosure_text is None
+
+
+def test_compose_logs_and_falls_back_when_llm_raises(caplog):
+    writer = DraftWriter(FailingLLMClient())
+
+    with caplog.at_level("WARNING"):
+        draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
+
+    assert draft is not None
+    assert "PromptHunt could fit" in draft.body
+    assert caplog.records
+    record = caplog.records[-1]
+    assert record.message == "LLM generation failed; using heuristic fallback"
+    assert record.exception_type == "RuntimeError"
+    assert record.exception_message == "boom"
+    assert record.thread_id == "thread-1"
+    assert record.subreddit == "PromptEngineering"
+    assert "RuntimeError: boom" in caplog.text
 
 
 def test_compose_appends_disclosure_for_monetized_mode():

@@ -190,6 +190,12 @@ Check:
 
 That usually means the code is using the heuristic fallback because `OPENAI_API_KEY` is missing or invalid, or the OpenAI request failed and the draft writer fell back to the built-in heuristic reply.
 
+When using `OPENAI_MODEL=gpt-5-mini` with the Responses API, do not send `temperature`. Older GPT-5 family models reject that parameter and return an HTTP 400.
+
+If you update `.env` while the app is already running, restart the process. Settings are cached via `get_settings()`, so a long-running dashboard or worker will keep using the previous values until restart.
+
+If OpenAI generation fails, the app now logs the error before falling back to the heuristic draft writer. Check the process logs first to confirm whether the request failed and why.
+
 ### Reddit posting is risky in local development
 
 Keep `AUTOPOST_ENABLED=false`, use the dashboard to inspect drafts first, and only test posting with a controlled Reddit account.

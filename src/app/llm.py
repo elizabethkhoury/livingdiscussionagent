@@ -15,12 +15,12 @@ class LLMMessage:
 
 
 class LLMClient:
-    def complete(self, messages: list[LLMMessage], temperature: float = 0.2) -> str:
+    def complete(self, messages: list[LLMMessage]) -> str:
         raise NotImplementedError
 
 
 class HeuristicLLMClient(LLMClient):
-    def complete(self, messages: list[LLMMessage], temperature: float = 0.2) -> str:
+    def complete(self, messages: list[LLMMessage]) -> str:
         return messages[-1].content
 
 
@@ -29,11 +29,10 @@ class OpenAILLMClient(LLMClient):
         self.api_key = api_key
         self.model = model
 
-    def complete(self, messages: list[LLMMessage], temperature: float = 0.2) -> str:
+    def complete(self, messages: list[LLMMessage]) -> str:
         payload = json.dumps(
             {
                 "model": self.model,
-                "temperature": temperature,
                 "input": [
                     {
                         "role": item.role,

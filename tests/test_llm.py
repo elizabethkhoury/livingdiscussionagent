@@ -76,8 +76,7 @@ def test_openai_llm_client_sends_expected_request(monkeypatch: pytest.MonkeyPatc
         [
             LLMMessage(role="system", content="System prompt"),
             LLMMessage(role="user", content="User prompt"),
-        ],
-        temperature=0.4,
+        ]
     )
 
     assert result == "Helpful reply"
@@ -89,7 +88,6 @@ def test_openai_llm_client_sends_expected_request(monkeypatch: pytest.MonkeyPatc
     }
     assert captured["payload"] == {
         "model": "gpt-5-mini",
-        "temperature": 0.4,
         "input": [
             {
                 "role": "system",

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 from src.app.llm import HeuristicLLMClient, LLMClient, LLMMessage, get_llm_client
 from src.domain.enums import PromotionMode, ResponseStrategy
 from src.domain.models import DecisionResult, DraftReply, ThreadContext
 from src.domain.policies import BANNED_HYPE_PHRASES
 from src.generate.disclosures import disclosure_for_mode
+
+logger = logging.getLogger(__name__)
 
 
 class DraftWriter:
@@ -41,7 +45,18 @@ class DraftWriter:
         messages = self._build_prompt(thread, decision)
         try:
             candidate = self.llm_client.complete(messages)
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "LLM generation failed; using heuristic fallback",
+                exc_info=exc,
+                extra={
+                    "exception_type": type(exc).__name__,
+                    "exception_message": str(exc),
+                    "llm_model": getattr(self.llm_client, "model", None),
+                    "thread_id": thread.thread_id,
+                    "subreddit": thread.post.subreddit,
+                },
+            )
             return None
         normalized_candidate = self._normalize_candidate(candidate, decision.promotion_mode)
         if self._is_usable_candidate(normalized_candidate, decision.promotion_mode):
