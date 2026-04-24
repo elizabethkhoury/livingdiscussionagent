@@ -25,14 +25,17 @@ class HeuristicLLMClient(LLMClient):
 
 
 class OpenAILLMClient(LLMClient):
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, timeout_seconds: int, max_output_tokens: int):
         self.api_key = api_key
         self.model = model
+        self.timeout_seconds = timeout_seconds
+        self.max_output_tokens = max_output_tokens
 
     def complete(self, messages: list[LLMMessage]) -> str:
         payload = json.dumps(
             {
                 "model": self.model,
+                "max_output_tokens": self.max_output_tokens,
                 "input": [
                     {
                         "role": item.role,
@@ -51,7 +54,7 @@ class OpenAILLMClient(LLMClient):
             },
             method="POST",
         )
-        with request.urlopen(req, timeout=30) as response:
+        with request.urlopen(req, timeout=self.timeout_seconds) as response:
             body = json.loads(response.read().decode("utf-8"))
         return _extract_output_text(body)
 
@@ -73,5 +76,10 @@ def _extract_output_text(response_body: dict[str, Any]) -> str:
 def get_llm_client():
     settings = get_settings()
     if settings.openai_api_key:
-        return OpenAILLMClient(settings.openai_api_key, settings.llm_model)
+        return OpenAILLMClient(
+            settings.openai_api_key,
+            settings.llm_model,
+            settings.openai_timeout_seconds,
+            settings.openai_max_output_tokens,
+        )
     return HeuristicLLMClient()

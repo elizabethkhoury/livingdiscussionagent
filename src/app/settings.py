@@ -46,9 +46,16 @@ class AppSettings(BaseSettings):
     autopost_enabled: bool = True
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     llm_model: str = Field(default="gpt-5-mini", alias="OPENAI_MODEL")
+    openai_timeout_seconds: int = Field(default=30, alias="OPENAI_TIMEOUT_SECONDS")
+    openai_max_output_tokens: int = Field(default=220, alias="OPENAI_MAX_OUTPUT_TOKENS")
+    openai_log_tracebacks: bool = Field(default=False, alias="OPENAI_LOG_TRACEBACKS")
     postgres_dsn: str = "postgresql+psycopg://localhost/prompthunt"
     reddit_username: str | None = Field(default=None, alias="REDDIT_USERNAME")
     reddit_password: str | None = Field(default=None, alias="REDDIT_PASSWORD")
+    reddit_posts_per_subreddit: int = Field(default=2, alias="REDDIT_POSTS_PER_SUBREDDIT")
+    reddit_comment_limit: int = Field(default=5, alias="REDDIT_COMMENT_LIMIT")
+    reddit_request_delay_seconds: float = Field(default=0.25, alias="REDDIT_REQUEST_DELAY_SECONDS")
+    reddit_reprocess_after_hours: int = Field(default=24, alias="REDDIT_REPROCESS_AFTER_HOURS")
     chrome_profile_dir: str = "chrome_profile"
     enabled_subreddits: list[str] = Field(default_factory=lambda: DEFAULT_SUBREDDITS.copy())
     monetized_link_domains: list[str] = Field(default_factory=lambda: ["prompthunt.me"])

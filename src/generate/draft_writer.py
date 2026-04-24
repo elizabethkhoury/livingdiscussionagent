@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 from src.app.llm import HeuristicLLMClient, LLMClient, LLMMessage, get_llm_client
+from src.app.settings import get_settings
 from src.domain.enums import PromotionMode, ResponseStrategy
 from src.domain.models import DecisionResult, DraftReply, ThreadContext
 from src.domain.policies import BANNED_HYPE_PHRASES
@@ -46,9 +48,11 @@ class DraftWriter:
         try:
             candidate = self.llm_client.complete(messages)
         except Exception as exc:
+            settings = get_settings()
+            message = "LLM generation timed out; using heuristic fallback" if type(exc).__name__ == "TimeoutError" else "LLM generation failed; using heuristic fallback"
             logger.warning(
-                "LLM generation failed; using heuristic fallback",
-                exc_info=exc,
+                message,
+                exc_info=sys.exc_info() if settings.openai_log_tracebacks else None,
                 extra={
                     "exception_type": type(exc).__name__,
                     "exception_message": str(exc),

@@ -64,9 +64,15 @@ POSTGRES_DSN=postgresql+psycopg://localhost/prompthunt
 
 OPENAI_API_KEY=your-openai-api-key
 OPENAI_MODEL=gpt-5-mini
+OPENAI_TIMEOUT_SECONDS=30
+OPENAI_MAX_OUTPUT_TOKENS=220
 
 REDDIT_USERNAME=your-reddit-username
 REDDIT_PASSWORD=your-reddit-password
+REDDIT_POSTS_PER_SUBREDDIT=2
+REDDIT_COMMENT_LIMIT=5
+REDDIT_REQUEST_DELAY_SECONDS=0.25
+REDDIT_REPROCESS_AFTER_HOURS=24
 
 CHROME_PROFILE_DIR=chrome_profile
 
@@ -154,8 +160,15 @@ These are the main settings defined in `src/app/settings.py`:
 | `POSTGRES_DSN` | `postgresql+psycopg://localhost/prompthunt` | SQLAlchemy connection string |
 | `OPENAI_API_KEY` | unset | Required for live OpenAI Responses API calls |
 | `OPENAI_MODEL` | `gpt-5-mini` | Default OpenAI model used for draft generation |
+| `OPENAI_TIMEOUT_SECONDS` | `30` | Timeout for OpenAI Responses API calls during draft generation |
+| `OPENAI_MAX_OUTPUT_TOKENS` | `220` | Maximum OpenAI response tokens requested for draft generation |
+| `OPENAI_LOG_TRACEBACKS` | `false` | Enables full traceback logging when OpenAI draft generation fails |
 | `REDDIT_USERNAME` | unset | Reddit login for Playwright posting |
 | `REDDIT_PASSWORD` | unset | Reddit login for Playwright posting |
+| `REDDIT_POSTS_PER_SUBREDDIT` | `2` | Maximum new posts fetched per configured subreddit during each ingest run |
+| `REDDIT_COMMENT_LIMIT` | `5` | Maximum comments fetched for thread context during ingest |
+| `REDDIT_REQUEST_DELAY_SECONDS` | `0.25` | Minimum delay between Reddit JSON requests |
+| `REDDIT_REPROCESS_AFTER_HOURS` | `24` | Hours before a classified Reddit thread can be considered again |
 | `CHROME_PROFILE_DIR` | `chrome_profile` | Persistent browser profile path |
 | `AUTOPOST_ENABLED` | `true` | High-level autopost toggle |
 | `ENABLED_SUBREDDITS` | built-in list | Subreddits scanned during ingest |
@@ -194,7 +207,7 @@ When using `OPENAI_MODEL=gpt-5-mini` with the Responses API, do not send `temper
 
 If you update `.env` while the app is already running, restart the process. Settings are cached via `get_settings()`, so a long-running dashboard or worker will keep using the previous values until restart.
 
-If OpenAI generation fails, the app now logs the error before falling back to the heuristic draft writer. Check the process logs first to confirm whether the request failed and why.
+If OpenAI generation fails or times out, the app logs a concise warning before falling back to the heuristic draft writer, so `ingest-once` can continue. Set `OPENAI_LOG_TRACEBACKS=true` only when you need full tracebacks while debugging. If live generation is still slow, reduce `OPENAI_MAX_OUTPUT_TOKENS` or configure a faster model.
 
 ### Reddit posting is risky in local development
 

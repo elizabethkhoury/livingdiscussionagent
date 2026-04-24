@@ -70,6 +70,15 @@ class ThreadRepository:
         )
         return list(self.session.scalars(stmt).all())
 
+    def recently_classified_platform_thread_ids(self, hours: int = 24):
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        stmt = (
+            select(schema.ThreadRecord.platform_thread_id)
+            .join(schema.ClassificationRecord, schema.ClassificationRecord.thread_id == schema.ThreadRecord.id)
+            .where(schema.ClassificationRecord.created_at >= cutoff)
+        )
+        return set(self.session.scalars(stmt).all())
+
     def count_posts_for_subreddit_since(self, subreddit: str, since: datetime):
         stmt = (
             select(func.count(schema.PostAttemptRecord.id))

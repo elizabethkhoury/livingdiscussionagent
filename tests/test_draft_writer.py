@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from src.app.settings import get_settings
 from src.domain.enums import DecisionAction, PromotionMode, ResponseStrategy, RiskLevel
 from src.domain.models import DecisionResult, PolicyDecisionTrace, RedditCommentCandidate, RedditPostCandidate, ThreadContext
 from src.generate.draft_writer import DraftWriter
@@ -17,6 +18,11 @@ class StubLLMClient:
 class FailingLLMClient:
     def complete(self, messages):
         raise RuntimeError("boom")
+
+
+class TimeoutLLMClient:
+    def complete(self, messages):
+        raise TimeoutError("The read operation timed out")
 
 
 def make_thread():
@@ -83,7 +89,42 @@ def test_compose_logs_and_falls_back_when_llm_raises(caplog):
     assert record.exception_message == "boom"
     assert record.thread_id == "thread-1"
     assert record.subreddit == "PromptEngineering"
+    assert record.exc_info is None
+    assert "Traceback" not in caplog.text
+    assert "RuntimeError: boom" not in caplog.text
+
+
+def test_compose_logs_traceback_when_enabled(monkeypatch, caplog):
+    monkeypatch.setenv("OPENAI_LOG_TRACEBACKS", "true")
+    get_settings.cache_clear()
+    writer = DraftWriter(FailingLLMClient())
+
+    with caplog.at_level("WARNING"):
+        draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
+
+    get_settings.cache_clear()
+    assert draft is not None
+    assert caplog.records
+    record = caplog.records[-1]
+    assert record.message == "LLM generation failed; using heuristic fallback"
+    assert record.exc_info is not None
     assert "RuntimeError: boom" in caplog.text
+
+
+def test_compose_logs_timeout_and_falls_back(caplog):
+    writer = DraftWriter(TimeoutLLMClient())
+
+    with caplog.at_level("WARNING"):
+        draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
+
+    assert draft is not None
+    assert "PromptHunt could fit" in draft.body
+    assert caplog.records
+    record = caplog.records[-1]
+    assert record.message == "LLM generation timed out; using heuristic fallback"
+    assert record.exception_type == "TimeoutError"
+    assert record.exception_message == "The read operation timed out"
+    assert record.exc_info is None
 
 
 def test_compose_appends_disclosure_for_monetized_mode():

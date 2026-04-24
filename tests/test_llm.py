@@ -28,6 +28,9 @@ def clear_settings_cache(monkeypatch: pytest.MonkeyPatch):
     get_settings.cache_clear()
     monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("OPENAI_MAX_OUTPUT_TOKENS", raising=False)
+    monkeypatch.delenv("OPENAI_LOG_TRACEBACKS", raising=False)
     yield
     get_settings.cache_clear()
 
@@ -47,6 +50,21 @@ def test_get_llm_client_uses_openai_with_api_key(monkeypatch: pytest.MonkeyPatch
     assert isinstance(client, OpenAILLMClient)
     assert client.api_key == "test-key"
     assert client.model == "gpt-test-mini"
+    assert client.timeout_seconds == 30
+    assert client.max_output_tokens == 220
+
+
+def test_get_llm_client_uses_configured_openai_limits(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_TIMEOUT_SECONDS", "12")
+    monkeypatch.setenv("OPENAI_MAX_OUTPUT_TOKENS", "100")
+    get_settings.cache_clear()
+
+    client = get_llm_client()
+
+    assert isinstance(client, OpenAILLMClient)
+    assert client.timeout_seconds == 12
+    assert client.max_output_tokens == 100
 
 
 def test_openai_llm_client_sends_expected_request(monkeypatch: pytest.MonkeyPatch):
@@ -71,7 +89,7 @@ def test_openai_llm_client_sends_expected_request(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr(llm.request, "urlopen", fake_urlopen)
 
-    client = OpenAILLMClient("secret", "gpt-5-mini")
+    client = OpenAILLMClient("secret", "gpt-5-mini", timeout_seconds=7, max_output_tokens=100)
     result = client.complete(
         [
             LLMMessage(role="system", content="System prompt"),
@@ -81,13 +99,14 @@ def test_openai_llm_client_sends_expected_request(monkeypatch: pytest.MonkeyPatc
 
     assert result == "Helpful reply"
     assert captured["url"] == "https://api.openai.com/v1/responses"
-    assert captured["timeout"] == 30
+    assert captured["timeout"] == 7
     assert captured["headers"] == {
         "Authorization": "Bearer secret",
         "Content-type": "application/json",
     }
     assert captured["payload"] == {
         "model": "gpt-5-mini",
+        "max_output_tokens": 100,
         "input": [
             {
                 "role": "system",
@@ -120,6 +139,6 @@ def test_openai_llm_client_extracts_multiple_output_text_blocks(monkeypatch: pyt
 
     monkeypatch.setattr(llm.request, "urlopen", fake_urlopen)
 
-    client = OpenAILLMClient("secret", "gpt-5-mini")
+    client = OpenAILLMClient("secret", "gpt-5-mini", timeout_seconds=10, max_output_tokens=220)
 
     assert client.complete([LLMMessage(role="user", content="Prompt")]) == "First line\nSecond line"

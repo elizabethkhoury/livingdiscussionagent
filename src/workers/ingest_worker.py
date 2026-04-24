@@ -5,6 +5,7 @@ from difflib import SequenceMatcher
 from src.app.settings import get_settings
 from src.classify.pipeline import ClassificationPipeline
 from src.decide.engine import RuleBasedDecisionEngine
+from src.domain.enums import DecisionAction
 from src.generate.draft_writer import DraftWriter
 from src.generate.evaluators import DraftEvaluator
 from src.ingest.candidate_selector import CandidateSelector
@@ -16,7 +17,7 @@ from src.storage.repositories import DecisionRepository, ThreadRepository
 class IngestWorker:
     def __init__(self):
         self.settings = get_settings()
-        self.reader = RedditJSONReader()
+        self.reader = RedditJSONReader(request_delay_seconds=self.settings.reddit_request_delay_seconds)
         self.selector = CandidateSelector()
         self.decision_engine = RuleBasedDecisionEngine()
         self.draft_writer = DraftWriter()
@@ -24,25 +25,73 @@ class IngestWorker:
 
     def run_once(self):
         processed = []
-        for subreddit in self.settings.enabled_subreddits:
-            for post in self.reader.fetch_posts(subreddit):
+        recently_classified_thread_ids = self._recently_classified_thread_ids()
+        for subreddit in self._enabled_subreddits():
+            for post in self.reader.fetch_posts(subreddit, limit=self.settings.reddit_posts_per_subreddit):
+                if self.reader.rate_limited:
+                    break
                 if post.age_hours > 24:
                     continue
-                full_thread = self.reader.fetch_thread_context(post)
+                if post.platform_thread_id in recently_classified_thread_ids:
+                    continue
+                full_thread = self.reader.fetch_thread_context(post, comment_limit=self.settings.reddit_comment_limit)
+                if self.reader.rate_limited:
+                    break
                 with session_scope() as session:
                     threads = ThreadRepository(session)
                     prior_bodies = threads.recent_post_bodies()
                 classifier = ClassificationPipeline(
                     duplicate_similarity_lookup=lambda candidate, prior_bodies=tuple(prior_bodies): self._duplicate_similarity(candidate.combined_text, list(prior_bodies))
                 )
+                candidates = []
                 for candidate in self.selector.select(full_thread):
                     classification = classifier.classify(candidate)
                     decision = self.decision_engine.decide(candidate, classification)
-                    draft = self.draft_writer.compose(candidate, decision)
-                    if draft:
-                        draft.evaluation = self.draft_evaluator.evaluate(candidate, draft)
-                    processed.append(self._persist(candidate, classification, decision, draft))
+                    candidates.append((candidate, classification, decision))
+                candidate, classification, decision = self._best_candidate(candidates)
+                draft = self.draft_writer.compose(candidate, decision)
+                if draft:
+                    draft.evaluation = self.draft_evaluator.evaluate(candidate, draft)
+                processed.append(self._persist(candidate, classification, decision, draft))
+                recently_classified_thread_ids.add(post.platform_thread_id)
+            if self.reader.rate_limited:
+                break
         return processed
+
+    def _enabled_subreddits(self):
+        seen = set()
+        subreddits = []
+        for subreddit in self.settings.enabled_subreddits:
+            key = subreddit.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            subreddits.append(subreddit)
+        return subreddits
+
+    def _recently_classified_thread_ids(self):
+        with session_scope() as session:
+            threads = ThreadRepository(session)
+            return threads.recently_classified_platform_thread_ids(hours=self.settings.reddit_reprocess_after_hours)
+
+    def _best_candidate(self, candidates):
+        return max(candidates, key=lambda item: self._candidate_rank(*item))
+
+    def _candidate_rank(self, candidate, classification, decision):
+        action_rank = {
+            DecisionAction.SKIP: 0,
+            DecisionAction.AUTOPOST_INFO: 1,
+            DecisionAction.QUEUE_REVIEW_RISKY: 2,
+            DecisionAction.QUEUE_REVIEW_PRODUCT: 3,
+        }.get(decision.action, 0)
+        return (
+            action_rank,
+            classification.value_add_score,
+            classification.promo_fit_score,
+            classification.relevance_score,
+            -classification.policy_risk_score,
+            candidate.target_comment is None,
+        )
 
     def _duplicate_similarity(self, text: str, prior_bodies: list[str]):
         if not prior_bodies:
