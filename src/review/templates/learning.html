@@ -6,6 +6,24 @@
   <pre>{{ weights }}</pre>
   <h2>Latest Threshold Event</h2>
   <pre>{{ threshold_event.payload_json if threshold_event else {} }}</pre>
+  <h2>Diary Memory</h2>
+  <p><strong>Path:</strong> {{ diary_path }}</p>
+  {% if memory_error %}
+    <p><strong>Error:</strong> {{ memory_error }}</p>
+  {% endif %}
+  <p><strong>Daily entries loaded:</strong> {{ memory_context.daily_entries|length if memory_context else 0 }}</p>
+  <p><strong>Monthly recaps loaded:</strong> {{ memory_context.monthly_recaps|length if memory_context else 0 }}</p>
+  <h3>Most Recent Daily Entry</h3>
+  {% if latest_daily_entry %}
+    <pre>{{ latest_daily_entry.model_dump() }}</pre>
+  {% else %}
+    <pre>{}</pre>
+  {% endif %}
+  <h3>Latest Monthly Recap</h3>
+  {% if latest_monthly_recap %}
+    <pre>{{ latest_monthly_recap.model_dump() }}</pre>
+  {% else %}
+    <pre>{}</pre>
+  {% endif %}
 </section>
 {% endblock %}
-

@@ -77,6 +77,10 @@ class AppSettings(BaseSettings):
     relevance_threshold_default: float = 0.65
     value_add_threshold_default: float = 0.70
     autopost_overall_threshold_default: float = 0.80
+    memory_diary_path: str = Field(default="memory/agent_diary.md", alias="MEMORY_DIARY_PATH")
+    memory_recent_days: int = Field(default=30, alias="MEMORY_RECENT_DAYS")
+    memory_monthly_recap_months: int = Field(default=6, alias="MEMORY_MONTHLY_RECAP_MONTHS")
+    memory_enabled: bool = Field(default=True, alias="MEMORY_ENABLED")
 
     @field_validator("postgres_dsn", mode="before")
     @classmethod

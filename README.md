@@ -9,6 +9,7 @@ Reddit-first recommendation agent for PromptHunt. It ingests threads from config
 - `src/workers/review_worker.py`: auto-posts approved or high-confidence drafts
 - `src/workers/monitor_worker.py`: refreshes post outcomes and writes learning examples
 - `src/workers/learning_worker.py`: updates learned weights from stored outcomes
+- `src/learn/diary_memory.py`: reads and writes the Markdown diary memory file
 - `src/review/`: FastAPI review dashboard
 - `src/storage/`: SQLAlchemy models and database access
 
@@ -114,6 +115,8 @@ Useful dashboard routes:
 - `/learning`
 - `/settings`
 
+The learning page also shows diary memory status, including the configured diary path, the latest daily entry, and the latest monthly recap.
+
 ### One-shot worker commands
 
 Run these manually while setting up or debugging:
@@ -123,6 +126,7 @@ python main.py ingest-once
 python main.py review-once
 python main.py monitor-once
 python main.py learn-once
+python main.py memory-once
 ```
 
 What they do:
@@ -130,7 +134,28 @@ What they do:
 - `ingest-once`: reads configured subreddits, classifies threads, creates decisions and drafts
 - `review-once`: auto-posts eligible drafts or approved drafts
 - `monitor-once`: refreshes engagement signals for posting attempts
-- `learn-once`: updates learned strategy weights from stored outcomes
+- `learn-once`: updates learned strategy weights and refreshes diary memory
+- `memory-once`: refreshes diary memory and forces a monthly recap update
+
+## Diary Memory
+
+The agent stores long-form memory in a human-readable Markdown file at:
+
+```text
+memory/agent_diary.md
+```
+
+Each daily entry summarizes the previous day:
+
+- what the agent did
+- what happened
+- what it learned
+- optional manual notes
+- outcome metrics
+
+Monthly recaps are stored in the same file so runtime prompts can read the last 30 daily entries and last 6 monthly recaps instead of scanning the full history. The decision engine uses memory as strategy and caution guidance, and the draft writer includes compact memory context in LLM prompts. Memory cannot bypass hard policy checks, subreddit deny rules, relevance thresholds, duplicate checks, or required review routing.
+
+Manual notes can be edited directly in the Markdown file under a daily entry’s `Manual notes` section. Automatic updates preserve those notes when rewriting the same day.
 
 ## Recommended First Local Run
 
@@ -172,6 +197,10 @@ These are the main settings defined in `src/app/settings.py`:
 | `CHROME_PROFILE_DIR` | `chrome_profile` | Persistent browser profile path |
 | `AUTOPOST_ENABLED` | `true` | High-level autopost toggle |
 | `ENABLED_SUBREDDITS` | built-in list | Subreddits scanned during ingest |
+| `MEMORY_ENABLED` | `true` | Enables diary memory reads during decision and draft generation |
+| `MEMORY_DIARY_PATH` | `memory/agent_diary.md` | Markdown diary memory file path |
+| `MEMORY_RECENT_DAYS` | `30` | Daily entries loaded into runtime memory |
+| `MEMORY_MONTHLY_RECAP_MONTHS` | `6` | Monthly recaps loaded into runtime memory |
 
 There are additional thresholds and circuit-breaker settings in `src/app/settings.py` for rate limiting, daily caps, and scoring thresholds.
 
@@ -180,7 +209,9 @@ There are additional thresholds and circuit-breaker settings in `src/app/setting
 Run the existing checks after changes:
 
 ```bash
+mypy src tests
 ruff check .
+ruff format --check .
 pytest
 ```
 

@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src.app.settings import get_settings
+from src.learn.diary_memory import load_memory_context
 from src.review.service import ReviewService
 from src.storage.db import session_scope
 from src.storage.repositories import DecisionRepository, LearningRepository
@@ -89,6 +90,14 @@ def create_review_app():
 
     @app.get("/learning", response_class=HTMLResponse)
     def learning_dashboard(request: Request):
+        settings = get_settings()
+        memory_error = None
+        memory_context = None
+        diary_path = Path(settings.memory_diary_path)
+        try:
+            memory_context = load_memory_context(diary_path, settings.memory_recent_days, settings.memory_monthly_recap_months)
+        except Exception as exc:
+            memory_error = f"{type(exc).__name__}: {exc}"
         with session_scope() as session:
             repo = LearningRepository(session)
             weights = repo.latest_strategy_weights()
@@ -96,7 +105,16 @@ def create_review_app():
         return templates.TemplateResponse(
             request,
             "learning.html",
-            {"weights": weights, "threshold_event": threshold_event, "title": "Learning"},
+            {
+                "weights": weights,
+                "threshold_event": threshold_event,
+                "title": "Learning",
+                "diary_path": diary_path,
+                "memory_context": memory_context,
+                "latest_daily_entry": memory_context.daily_entries[0] if memory_context and memory_context.daily_entries else None,
+                "latest_monthly_recap": memory_context.monthly_recaps[0] if memory_context and memory_context.monthly_recaps else None,
+                "memory_error": memory_error,
+            },
         )
 
     @app.get("/settings", response_class=HTMLResponse)

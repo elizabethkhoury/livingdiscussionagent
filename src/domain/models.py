@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -148,6 +148,29 @@ class LearningUpdateReport(BaseModel):
     reason: str
     strategy_weights: dict[str, float] = Field(default_factory=dict)
     thresholds: dict[str, float] = Field(default_factory=dict)
+
+
+class DiaryEntry(BaseModel):
+    date: date
+    yesterday: str
+    what_happened: str
+    what_i_learned: str
+    manual_notes: str | None = None
+    metrics: dict[str, int | float | str] = Field(default_factory=dict)
+
+
+class MonthlyDiaryRecap(BaseModel):
+    month: str
+    summary: str
+    lessons: list[str] = Field(default_factory=list)
+    strategy_adjustments: list[str] = Field(default_factory=list)
+    risk_notes: list[str] = Field(default_factory=list)
+
+
+class MemoryContext(BaseModel):
+    daily_entries: list[DiaryEntry] = Field(default_factory=list)
+    monthly_recaps: list[MonthlyDiaryRecap] = Field(default_factory=list)
+    prompt_text: str = ""
 
 
 class RuntimeThresholds(BaseModel):

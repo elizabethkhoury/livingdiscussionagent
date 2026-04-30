@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import json
+from typing import TypedDict
 from urllib import request
 
 from src.domain.models import EngagementSnapshot
 from src.storage.db import session_scope
 from src.storage.repositories import DecisionRepository
+
+
+class _EngagementPayload(TypedDict):
+    score: int
+    reply_count: int
+    is_deleted: bool
+    is_removed: bool
+    is_locked: bool
 
 
 class RedditEngagementFetcher:
@@ -22,7 +31,7 @@ class RedditEngagementFetcher:
                     is_removed=False,
                     is_locked=False,
                 )
-            payload = {"score": 1, "reply_count": 0, "is_deleted": False, "is_removed": False, "is_locked": False}
+            payload: _EngagementPayload = {"score": 1, "reply_count": 0, "is_deleted": False, "is_removed": False, "is_locked": False}
             try:
                 req = request.Request(
                     f"https://www.reddit.com/comments/{attempt.posted_comment_id}.json",

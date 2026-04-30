@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from email.message import Message
 from urllib import error
 
 import pytest
@@ -12,7 +13,7 @@ def test_fetch_posts_returns_empty_list_on_http_error(monkeypatch: pytest.Monkey
     reader = RedditJSONReader()
 
     def fake_fetch_json(_url: str):
-        raise error.HTTPError("https://www.reddit.com/r/missing/new.json?limit=25", 404, "Not Found", hdrs=None, fp=None)
+        raise error.HTTPError("https://www.reddit.com/r/missing/new.json?limit=25", 404, "Not Found", hdrs=Message(), fp=None)
 
     monkeypatch.setattr(reader, "_fetch_json", fake_fetch_json)
 
@@ -23,7 +24,7 @@ def test_fetch_posts_logs_status_code_and_url_on_http_error(monkeypatch: pytest.
     reader = RedditJSONReader()
 
     def fake_fetch_json(_url: str):
-        raise error.HTTPError("https://www.reddit.com/r/missing/new.json?limit=25", 404, "Not Found", hdrs=None, fp=None)
+        raise error.HTTPError("https://www.reddit.com/r/missing/new.json?limit=25", 404, "Not Found", hdrs=Message(), fp=None)
 
     monkeypatch.setattr(reader, "_fetch_json", fake_fetch_json)
 
@@ -39,7 +40,7 @@ def test_fetch_posts_marks_reader_rate_limited_on_429(monkeypatch: pytest.Monkey
     reader = RedditJSONReader()
 
     def fake_fetch_json(_url: str):
-        raise error.HTTPError("https://www.reddit.com/r/all/new.json?limit=25", 429, "Too Many Requests", hdrs=None, fp=None)
+        raise error.HTTPError("https://www.reddit.com/r/all/new.json?limit=25", 429, "Too Many Requests", hdrs=Message(), fp=None)
 
     monkeypatch.setattr(reader, "_fetch_json", fake_fetch_json)
 

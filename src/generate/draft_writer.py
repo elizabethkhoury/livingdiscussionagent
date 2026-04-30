@@ -6,21 +6,24 @@ import sys
 from src.app.llm import HeuristicLLMClient, LLMClient, LLMMessage, get_llm_client
 from src.app.settings import get_settings
 from src.domain.enums import PromotionMode, ResponseStrategy
-from src.domain.models import DecisionResult, DraftReply, ThreadContext
+from src.domain.models import DecisionResult, DraftReply, MemoryContext, ThreadContext
 from src.domain.policies import BANNED_HYPE_PHRASES
 from src.generate.disclosures import disclosure_for_mode
+from src.learn.memory_provider import MemoryProvider
 
 logger = logging.getLogger(__name__)
 
 
 class DraftWriter:
-    def __init__(self, llm_client: LLMClient | None = None):
+    def __init__(self, llm_client: LLMClient | None = None, memory_provider: MemoryProvider | None = None):
         self.llm_client = llm_client or get_llm_client()
+        self.memory_provider = memory_provider or MemoryProvider()
 
     def compose(self, thread: ThreadContext, decision: DecisionResult):
         if decision.action.value == "skip":
             return None
-        body = self._generate_with_fallback(thread, decision)
+        memory_context = self.memory_provider.get_context()
+        body = self._generate_with_fallback(thread, decision, memory_context)
         disclosure = disclosure_for_mode(decision.promotion_mode)
         if decision.promotion_mode == PromotionMode.DISCLOSED_MONETIZED and disclosure and disclosure not in body:
             body = f"{body} {disclosure}".strip()
@@ -35,16 +38,16 @@ class DraftWriter:
             autopost_eligible=decision.promotion_mode == PromotionMode.NONE,
         )
 
-    def _generate_with_fallback(self, thread: ThreadContext, decision: DecisionResult):
-        generated_body = self._generate_body(thread, decision)
+    def _generate_with_fallback(self, thread: ThreadContext, decision: DecisionResult, memory_context: MemoryContext):
+        generated_body = self._generate_body(thread, decision, memory_context)
         if generated_body:
             return generated_body
-        return self._heuristic_body(thread, decision)
+        return self._heuristic_body(thread, decision, memory_context)
 
-    def _generate_body(self, thread: ThreadContext, decision: DecisionResult):
+    def _generate_body(self, thread: ThreadContext, decision: DecisionResult, memory_context: MemoryContext):
         if isinstance(self.llm_client, HeuristicLLMClient):
             return None
-        messages = self._build_prompt(thread, decision)
+        messages = self._build_prompt(thread, decision, memory_context)
         try:
             candidate = self.llm_client.complete(messages)
         except Exception as exc:
@@ -67,7 +70,7 @@ class DraftWriter:
             return normalized_candidate
         return None
 
-    def _build_prompt(self, thread: ThreadContext, decision: DecisionResult):
+    def _build_prompt(self, thread: ThreadContext, decision: DecisionResult, memory_context: MemoryContext | None = None):
         disclosure = disclosure_for_mode(decision.promotion_mode)
         strategy = decision.selected_strategy.value.replace("_", " ")
         thread_sections = [
@@ -82,6 +85,12 @@ class DraftWriter:
             disclosure_line = f"Required disclosure text: {disclosure}"
         else:
             disclosure_line = "Required disclosure text: none"
+        memory_lines = []
+        if memory_context and memory_context.prompt_text:
+            memory_lines = [
+                "",
+                memory_context.prompt_text,
+            ]
         user_prompt = "\n".join(
             [
                 "Write a single Reddit reply for this thread.",
@@ -100,6 +109,7 @@ class DraftWriter:
                 "",
                 "Thread context:",
                 *thread_sections,
+                *memory_lines,
                 "",
                 "Return only the reply body as plain text.",
             ]
@@ -134,10 +144,13 @@ class DraftWriter:
             return False
         return True
 
-    def _heuristic_body(self, thread: ThreadContext, decision: DecisionResult):
+    def _heuristic_body(self, thread: ThreadContext, decision: DecisionResult, memory_context: MemoryContext):
         problem = self._acknowledge(thread)
-        advice = self._advice(thread, decision.selected_strategy)
+        advice = self._advice(thread, decision.selected_strategy, memory_context)
         body = f"{problem} {advice}"
+        caution = self._memory_caution(memory_context)
+        if caution:
+            body = f"{body} {caution}"
         if decision.promotion_mode == PromotionMode.PLAIN_MENTION:
             body = f"{body} If a shared prompt library would help, a tool like PromptHunt could fit depending on whether you want private storage or community discovery."
         if decision.promotion_mode == PromotionMode.DISCLOSED_MONETIZED:
@@ -155,7 +168,9 @@ class DraftWriter:
             return "The main thing to solve first is the immediate prompt workflow gap in the thread."
         return "The thread is really pointing at a workflow issue that can be made much less painful."
 
-    def _advice(self, thread: ThreadContext, strategy: ResponseStrategy):
+    def _advice(self, thread: ThreadContext, strategy: ResponseStrategy, memory_context: MemoryContext):
+        if self._memory_prefers_specificity(memory_context):
+            return "Keep the reply anchored to the exact workflow details in the thread and avoid broad product claims."
         if strategy == ResponseStrategy.COMPARATIVE:
             return "Compare tools on whether they help you store proven prompts, retrieve them quickly, and keep context around why they worked."
         if strategy == ResponseStrategy.EXPERIENTIAL:
@@ -163,3 +178,14 @@ class DraftWriter:
         if strategy == ResponseStrategy.RESOURCE_LINKING:
             return "A good answer should separate private prompt storage, reusable templates, and community discovery because those are different needs."
         return "A solid next step is to capture the exact prompt, the model used, and the output quality notes so reuse becomes deliberate instead of accidental."
+
+    def _memory_prefers_specificity(self, memory_context: MemoryContext):
+        memory_text = memory_context.prompt_text.lower()
+        return "more specific" in memory_text or "prioritize specificity" in memory_text
+
+    def _memory_caution(self, memory_context: MemoryContext):
+        removals = sum(int(entry.metrics.get("removals", 0)) for entry in memory_context.daily_entries)
+        negative_rewards = sum(int(entry.metrics.get("negative_rewards", 0)) for entry in memory_context.daily_entries)
+        if removals or negative_rewards:
+            return "Given recent outcome signals, keep the tone practical and avoid pushing a tool unless it directly fits the request."
+        return ""

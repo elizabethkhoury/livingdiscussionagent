@@ -259,6 +259,54 @@ class LearningRepository:
         stmt = select(schema.LearningExampleRecord).where(schema.LearningExampleRecord.created_at >= cutoff)
         return list(self.session.scalars(stmt).all())
 
+    def learning_examples_between(self, start: datetime, end: datetime):
+        stmt = (
+            select(schema.LearningExampleRecord)
+            .where(schema.LearningExampleRecord.created_at >= start)
+            .where(schema.LearningExampleRecord.created_at < end)
+            .order_by(schema.LearningExampleRecord.created_at.asc())
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def post_attempts_between(self, start: datetime, end: datetime):
+        stmt = (
+            select(schema.PostAttemptRecord)
+            .where(schema.PostAttemptRecord.created_at >= start)
+            .where(schema.PostAttemptRecord.created_at < end)
+            .order_by(schema.PostAttemptRecord.created_at.asc())
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def reviews_between(self, start: datetime, end: datetime):
+        stmt = (
+            select(schema.ReviewRecord)
+            .where(schema.ReviewRecord.reviewed_at.is_not(None))
+            .where(schema.ReviewRecord.reviewed_at >= start)
+            .where(schema.ReviewRecord.reviewed_at < end)
+            .order_by(schema.ReviewRecord.reviewed_at.asc())
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def engagement_snapshots_between(self, start: datetime, end: datetime):
+        stmt = (
+            select(schema.EngagementSnapshotRecord)
+            .where(schema.EngagementSnapshotRecord.captured_at >= start)
+            .where(schema.EngagementSnapshotRecord.captured_at < end)
+            .order_by(schema.EngagementSnapshotRecord.captured_at.asc())
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def system_events_between(self, start: datetime, end: datetime, event_type: str | None = None):
+        stmt = (
+            select(schema.SystemEventRecord)
+            .where(schema.SystemEventRecord.created_at >= start)
+            .where(schema.SystemEventRecord.created_at < end)
+            .order_by(schema.SystemEventRecord.created_at.asc())
+        )
+        if event_type is not None:
+            stmt = stmt.where(schema.SystemEventRecord.event_type == event_type)
+        return list(self.session.scalars(stmt).all())
+
     def store_strategy_weights(self, version: int, weights: dict[str, float]):
         records = []
         for strategy, weight in weights.items():

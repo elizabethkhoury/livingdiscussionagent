@@ -3,16 +3,20 @@ from __future__ import annotations
 from src.app.config import get_default_thresholds
 from src.decide.strategy_selector import StrategySelector
 from src.domain.enums import DecisionAction, PromotionMode, RiskLevel, SubredditPromoPolicy
-from src.domain.models import ClassificationResult, DecisionResult, PolicyDecisionTrace, ThreadContext
+from src.domain.models import ClassificationResult, DecisionResult, MemoryContext, PolicyDecisionTrace, ThreadContext
 from src.domain.policies import prompthunt_eligible
+from src.learn.memory_provider import MemoryProvider
 
 
 class RuleBasedDecisionEngine:
-    def __init__(self):
+    def __init__(self, memory_provider: MemoryProvider | None = None):
         self.thresholds = get_default_thresholds()
         self.strategy_selector = StrategySelector()
+        self.memory_provider = memory_provider or MemoryProvider()
 
     def decide(self, thread: ThreadContext, classification: ClassificationResult):
+        memory_context = self.memory_provider.get_context()
+        strategy = self._select_strategy(classification.intent, memory_context)
         trace = PolicyDecisionTrace(
             thresholds=self.thresholds.model_dump(),
             classifier_summary={
@@ -21,9 +25,12 @@ class RuleBasedDecisionEngine:
                 "policy_risk_score": classification.policy_risk_score,
                 "promo_fit_score": classification.promo_fit_score,
                 "duplicate_similarity_score": classification.duplicate_similarity_score,
+                "memory_context": self._memory_summary(memory_context),
             },
         )
-        strategy = self.strategy_selector.select(classification.intent)
+        memory_reason = self._memory_strategy_reason(memory_context)
+        if memory_reason:
+            trace.reason_codes.append(memory_reason)
         lower = thread.combined_text.lower()
         blocked_signals = ["meme", "job posting", "lawsuit", "earnings", "locked"]
         if any(signal in lower for signal in blocked_signals):
@@ -106,6 +113,16 @@ class RuleBasedDecisionEngine:
                 selected_strategy=strategy,
                 trace=trace,
             )
+        if self._memory_requires_review(memory_context):
+            trace.reason_codes.append("memory_caution_requires_review")
+            return DecisionResult(
+                action=DecisionAction.QUEUE_REVIEW_RISKY,
+                promotion_mode=PromotionMode.NONE,
+                requires_review=True,
+                risk_level=RiskLevel.MEDIUM,
+                selected_strategy=strategy,
+                trace=trace,
+            )
         trace.reason_codes.append("autopost_information_only")
         return DecisionResult(
             action=DecisionAction.AUTOPOST_INFO,
@@ -115,3 +132,43 @@ class RuleBasedDecisionEngine:
             selected_strategy=strategy,
             trace=trace,
         )
+
+    def _select_strategy(self, intent: str, memory_context: MemoryContext):
+        if self._memory_prefers_comparative(memory_context):
+            return self.strategy_selector.select("comparison")
+        return self.strategy_selector.select(intent)
+
+    def _memory_prefers_comparative(self, memory_context: MemoryContext):
+        memory_text = memory_context.prompt_text.lower()
+        return "prefer comparative" in memory_text or "favor educational and comparative" in memory_text
+
+    def _memory_strategy_reason(self, memory_context: MemoryContext):
+        if self._memory_prefers_comparative(memory_context):
+            return "memory_prefers_comparative_strategy"
+        return None
+
+    def _memory_requires_review(self, memory_context: MemoryContext):
+        removals = sum(int(entry.metrics.get("removals", 0)) for entry in memory_context.daily_entries)
+        negative_rewards = sum(int(entry.metrics.get("negative_rewards", 0)) for entry in memory_context.daily_entries)
+        rewards = [
+            float(entry.metrics.get("average_reward", 0.0))
+            for entry in memory_context.daily_entries
+            if int(entry.metrics.get("learning_examples", 0)) > 0
+        ]
+        low_average_reward = bool(rewards) and (sum(rewards) / len(rewards)) < 0.25
+        return removals > 0 or negative_rewards >= 3 or low_average_reward
+
+    def _memory_summary(self, memory_context: MemoryContext):
+        if not memory_context.daily_entries and not memory_context.monthly_recaps:
+            return "none"
+        latest_entry = memory_context.daily_entries[0] if memory_context.daily_entries else None
+        latest_recap = memory_context.monthly_recaps[0] if memory_context.monthly_recaps else None
+        parts = [
+            f"daily_entries={len(memory_context.daily_entries)}",
+            f"monthly_recaps={len(memory_context.monthly_recaps)}",
+        ]
+        if latest_entry:
+            parts.append(f"latest_lesson={latest_entry.what_i_learned}")
+        if latest_recap:
+            parts.append(f"latest_recap={latest_recap.summary}")
+        return "; ".join(parts)

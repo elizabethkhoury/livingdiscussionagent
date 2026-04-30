@@ -7,6 +7,7 @@ import uvicorn
 
 from src.app.logging import configure_logging
 from src.app.settings import get_settings
+from src.learn.diary_builder import DiaryBuilder
 from src.review.api import create_review_app
 from src.storage.db import Base, engine
 from src.workers.ingest_worker import IngestWorker
@@ -23,7 +24,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description="PromptHunt Reddit agent")
     parser.add_argument(
         "command",
-        choices=["bootstrap", "dashboard", "ingest-once", "review-once", "monitor-once", "learn-once"],
+        choices=["bootstrap", "dashboard", "ingest-once", "review-once", "monitor-once", "learn-once", "memory-once"],
     )
     return parser
 
@@ -44,6 +45,9 @@ async def run_async_command(command: str):
     if command == "learn-once":
         bootstrap()
         return LearningWorker().run_once()
+    if command == "memory-once":
+        bootstrap()
+        return DiaryBuilder().update(force_monthly=True)
     raise ValueError(f"Unknown command: {command}")
 
 
