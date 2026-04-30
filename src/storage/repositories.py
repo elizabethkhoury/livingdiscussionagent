@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.domain.enums import DraftStatus
+from src.domain.enums import AttemptStatus, DraftStatus
 from src.domain.models import ClassificationResult, DecisionResult, DraftReply, EngagementSnapshot
 from src.storage import schema
 
@@ -167,9 +168,85 @@ class DecisionRepository:
         self.session.flush()
         return record
 
-    def record_attempt(self, draft_id: int, transport: str, status: str, posted_comment_id: str | None = None, error_message: str | None = None):
+    def reply_target_key_for_draft(self, draft):
+        classification = draft.decision.classification
+        if classification.target_comment is not None:
+            return f"reddit:comment:{classification.target_comment.platform_comment_id}"
+        return f"reddit:thread:{classification.thread.platform_thread_id}"
+
+    def has_active_attempt_for_target(self, reply_target_key: str):
+        stmt = select(func.count(schema.PostAttemptRecord.id)).where(
+            schema.PostAttemptRecord.reply_target_key == reply_target_key,
+            schema.PostAttemptRecord.status.in_([AttemptStatus.PENDING.value, AttemptStatus.POSTED.value]),
+        )
+        return bool(self.session.scalar(stmt))
+
+    def create_pending_attempt(self, draft_id: int, transport: str):
+        draft = self.session.get(schema.DraftRecord, draft_id)
+        if draft is None:
+            raise ValueError(f"Unknown draft {draft_id}")
+        if draft.status in {DraftStatus.POSTED.value, DraftStatus.PUBLISHING.value, DraftStatus.REJECTED.value, DraftStatus.DUPLICATE.value}:
+            return None
+        reply_target_key = self.reply_target_key_for_draft(draft)
+        if self.has_active_attempt_for_target(reply_target_key):
+            self.mark_duplicate_draft(draft_id, f"active_attempt_for_{reply_target_key}")
+            return None
         record = schema.PostAttemptRecord(
             draft_id=draft_id,
+            reply_target_key=reply_target_key,
+            transport=transport,
+            status=AttemptStatus.PENDING.value,
+        )
+        nested = self.session.begin_nested()
+        try:
+            self.session.add(record)
+            draft.status = DraftStatus.PUBLISHING.value
+            self.session.flush()
+            nested.commit()
+        except IntegrityError:
+            nested.rollback()
+            self.mark_duplicate_draft(draft_id, f"active_attempt_for_{reply_target_key}")
+            return None
+        return record
+
+    def finish_attempt(self, attempt_id: int, status: str, posted_comment_id: str | None = None, error_message: str | None = None):
+        record = self.session.get(schema.PostAttemptRecord, attempt_id)
+        if record is None:
+            raise ValueError(f"Unknown post attempt {attempt_id}")
+        record.status = status
+        record.posted_comment_id = posted_comment_id
+        record.error_message = error_message
+        record.posted_at = datetime.utcnow() if status == AttemptStatus.POSTED.value else None
+        draft = self.session.get(schema.DraftRecord, record.draft_id)
+        if draft:
+            draft.status = DraftStatus.POSTED.value if status == AttemptStatus.POSTED.value else DraftStatus.FAILED.value
+        self.session.flush()
+        return record
+
+    def mark_duplicate_draft(self, draft_id: int, reason: str):
+        draft = self.session.get(schema.DraftRecord, draft_id)
+        if draft is None:
+            raise ValueError(f"Unknown draft {draft_id}")
+        draft.status = DraftStatus.DUPLICATE.value
+        self.session.add(schema.SystemEventRecord(event_type="duplicate_reply_target", payload_json={"draft_id": draft_id, "reason": reason}))
+        self.session.flush()
+        return draft
+
+    def record_attempt(
+        self,
+        draft_id: int,
+        transport: str,
+        status: str,
+        posted_comment_id: str | None = None,
+        error_message: str | None = None,
+        reply_target_key: str | None = None,
+    ):
+        draft = self.session.get(schema.DraftRecord, draft_id)
+        if reply_target_key is None and draft is not None:
+            reply_target_key = self.reply_target_key_for_draft(draft)
+        record = schema.PostAttemptRecord(
+            draft_id=draft_id,
+            reply_target_key=reply_target_key,
             transport=transport,
             status=status,
             posted_comment_id=posted_comment_id,

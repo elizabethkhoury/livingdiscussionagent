@@ -34,4 +34,10 @@ class PostingService:
         allowed, state = self.can_post(subreddit)
         if not allowed:
             raise RuntimeError(f"Circuit breaker active: {state}")
-        return await self.transport.publish(draft_id)
+        with session_scope() as session:
+            decisions = DecisionRepository(session)
+            attempt = decisions.create_pending_attempt(draft_id, "playwright")
+            if attempt is None:
+                return None
+            attempt_id = attempt.id
+        return await self.transport.publish(draft_id, attempt_id)

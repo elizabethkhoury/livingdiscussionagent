@@ -150,11 +150,7 @@ class RuleBasedDecisionEngine:
     def _memory_requires_review(self, memory_context: MemoryContext):
         removals = sum(int(entry.metrics.get("removals", 0)) for entry in memory_context.daily_entries)
         negative_rewards = sum(int(entry.metrics.get("negative_rewards", 0)) for entry in memory_context.daily_entries)
-        rewards = [
-            float(entry.metrics.get("average_reward", 0.0))
-            for entry in memory_context.daily_entries
-            if int(entry.metrics.get("learning_examples", 0)) > 0
-        ]
+        rewards = [float(entry.metrics.get("average_reward", 0.0)) for entry in memory_context.daily_entries if int(entry.metrics.get("learning_examples", 0)) > 0]
         low_average_reward = bool(rewards) and (sum(rewards) / len(rewards)) < 0.25
         return removals > 0 or negative_rewards >= 3 or low_average_reward
 

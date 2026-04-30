@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import Session, sessionmaker
@@ -26,6 +28,7 @@ from src.domain.models import (
     ThreadContext,
 )
 from src.storage import schema
+from src.storage.repositories import DecisionRepository, ThreadRepository
 from src.workers.ingest_worker import IngestWorker
 
 
@@ -250,6 +253,30 @@ def test_run_once_skips_recently_classified_threads(monkeypatch, sqlite_session_
     assert worker.run_once() == []
     assert worker.reader.fetch_post_calls == [("PromptEngineering", 2), ("PromptEngineering", 2)]
     assert worker.reader.context_calls == [("thread-1", 5)]
+
+
+def test_run_once_skips_threads_with_recent_posted_attempt(monkeypatch, sqlite_session_local):
+    with db.session_scope() as session:
+        threads = ThreadRepository(session)
+        decisions = DecisionRepository(session)
+        thread_record = threads.upsert_thread(make_thread())
+        classification_record = decisions.create_classification(thread_record.id, None, make_classification())
+        classification_record.created_at = datetime.utcnow() - timedelta(days=3)
+        decision_record = decisions.create_decision(classification_record.id, make_decision())
+        draft_record = decisions.create_draft(decision_record.id, make_draft(), status=DraftStatus.POSTED.value)
+        decisions.record_attempt(draft_record.id, "playwright", "posted", posted_comment_id="posted-comment")
+
+    monkeypatch.setattr("src.workers.ingest_worker.ClassificationPipeline", FakeClassificationPipeline)
+    worker = IngestWorker()
+    worker.settings.enabled_subreddits = ["PromptEngineering"]
+    worker.settings.reddit_reprocess_after_hours = 1
+    worker.reader = FakeReader([make_thread().post])
+    worker.decision_engine = FakeDecisionEngine()
+    worker.draft_writer = FakeDraftWriter()
+    worker.draft_evaluator = FakeDraftEvaluator()
+
+    assert worker.run_once() == []
+    assert worker.reader.context_calls == []
 
 
 def test_best_candidate_prefers_product_review_over_autopost():

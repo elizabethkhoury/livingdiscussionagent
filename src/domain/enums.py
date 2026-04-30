@@ -66,9 +66,11 @@ class DraftStatus(StrEnum):
     CREATED = "created"
     QUEUED = "queued"
     APPROVED = "approved"
+    PUBLISHING = "publishing"
     REJECTED = "rejected"
     POSTED = "posted"
     FAILED = "failed"
+    DUPLICATE = "duplicate"
 
 
 class ReviewStatus(StrEnum):

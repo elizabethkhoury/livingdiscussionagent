@@ -36,5 +36,7 @@ class ReviewWorker:
                 eligible.append((draft.id, draft.decision.classification.thread.subreddit))
         posted = []
         for draft_id, subreddit in eligible:
-            posted.append(await self.poster.publish_draft(draft_id, subreddit))
+            attempt = await self.poster.publish_draft(draft_id, subreddit)
+            if attempt is not None:
+                posted.append(attempt)
         return posted

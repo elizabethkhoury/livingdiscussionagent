@@ -72,7 +72,7 @@ class IngestWorker:
     def _recently_classified_thread_ids(self):
         with session_scope() as session:
             threads = ThreadRepository(session)
-            return threads.recently_classified_platform_thread_ids(hours=self.settings.reddit_reprocess_after_hours)
+            return threads.recently_classified_platform_thread_ids(hours=self.settings.reddit_reprocess_after_hours) | threads.posted_thread_ids()
 
     def _best_candidate(self, candidates):
         return max(candidates, key=lambda item: self._candidate_rank(*item))

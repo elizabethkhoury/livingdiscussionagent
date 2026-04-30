@@ -21,48 +21,48 @@ class PlaywrightPostingTransport:
         self.settings = get_settings()
         self.profile_dir = os.path.join(os.getcwd(), self.settings.chrome_profile_dir)
 
-    async def publish(self, draft_id: int):
+    async def publish(self, draft_id: int, attempt_id: int):
         with session_scope() as session:
             decisions = DecisionRepository(session)
             draft = decisions.get_draft(draft_id)
             if draft is None:
                 raise ValueError(f"Unknown draft {draft_id}")
-            decision = draft.decision
-            classification = decision.classification
+            classification = draft.decision.classification
             thread = classification.thread
-            target_comment = classification.target_comment_id
+            target_comment_id = classification.target_comment.platform_comment_id if classification.target_comment else None
+            post_url = thread.url
+            reply_text = draft.body
+            posted_comment_id = f"{thread.platform_thread_id}-posted"
         try:
             async with async_playwright() as playwright:
                 context, page = await self._make_context(playwright)
                 await self._login(page)
                 success = await self._post_comment(
                     page=page,
-                    post_url=thread.url,
-                    reply_text=draft.body,
-                    is_reply_to_comment=bool(target_comment),
+                    post_url=post_url,
+                    reply_text=reply_text,
+                    target_comment_id=target_comment_id,
                 )
                 if success:
-                    attempt = self._record_attempt(draft_id, "posted", posted_comment_id=f"{thread.platform_thread_id}-posted")
+                    attempt = self._finish_attempt(attempt_id, "posted", posted_comment_id=posted_comment_id)
                 else:
-                    attempt = self._record_attempt(draft_id, "failed", error_message="publish_failed")
+                    attempt = self._finish_attempt(attempt_id, "failed", error_message="publish_failed")
                 await context.close()
                 return attempt
         except Exception as exc:  # pragma: no cover - browser/runtime integration
             self._record_event("playwright_error", {"draft_id": draft_id, "error": str(exc)})
             self._write_failure_snapshot(draft_id, str(exc))
-            return self._record_attempt(draft_id, "failed", error_message=str(exc))
+            return self._finish_attempt(attempt_id, "failed", error_message=str(exc))
 
-    def _record_attempt(self, draft_id: int, status: str, posted_comment_id: str | None = None, error_message: str | None = None):
+    def _finish_attempt(self, attempt_id: int, status: str, posted_comment_id: str | None = None, error_message: str | None = None):
         with session_scope() as session:
             decisions = DecisionRepository(session)
-            record = decisions.record_attempt(
-                draft_id=draft_id,
-                transport="playwright",
+            record = decisions.finish_attempt(
+                attempt_id=attempt_id,
                 status=status,
                 posted_comment_id=posted_comment_id,
                 error_message=error_message,
             )
-            decisions.set_draft_status(draft_id, "posted" if status == "posted" else "failed")
             return PostAttempt(
                 attempt_id=record.id,
                 draft_id=record.draft_id,
@@ -180,28 +180,51 @@ class PlaywrightPostingTransport:
                 continue
         return None
 
-    async def _open_reply_composer(self, page):
-        for scroll_y in range(300, 8000, 250):
-            await page.evaluate(f"window.scrollTo(0, {scroll_y})")
-            await page.wait_for_timeout(150)
-            clicked = await page.evaluate(
-                """() => {
-                    for (const button of document.querySelectorAll('button')) {
-                        const text = (button.innerText || button.textContent || '').trim().toLowerCase();
-                        if (text === 'reply') {
-                            button.click();
-                            return true;
+    async def _open_reply_composer(self, page, target_comment_id: str):
+        for selector in self._target_comment_selectors(target_comment_id):
+            try:
+                target = page.locator(selector).first
+                await target.scroll_into_view_if_needed(timeout=3000)
+                clicked = await target.evaluate(
+                    """(node) => {
+                        const buttons = Array.from(node.querySelectorAll('button'));
+                        const reply = buttons.find((button) => {
+                            const text = (button.innerText || button.textContent || '').trim().toLowerCase();
+                            const aria = (button.getAttribute('aria-label') || '').trim().toLowerCase();
+                            return text === 'reply' || aria === 'reply' || aria.includes('reply to comment');
+                        });
+                        if (!reply) {
+                            return false;
                         }
-                    }
-                    return false;
-                }"""
-            )
-            if clicked:
-                await page.wait_for_timeout(1500)
-                editor = await self._wait_for_editor(page)
-                if editor:
-                    return editor
+                        reply.click();
+                        return true;
+                    }"""
+                )
+                if clicked:
+                    await page.wait_for_timeout(1500)
+                    editor = await self._wait_for_editor(page)
+                    if editor:
+                        return editor
+            except Exception:
+                continue
         return None
+
+    def _target_comment_selectors(self, target_comment_id: str):
+        comment_ids = [target_comment_id]
+        if not target_comment_id.startswith("t1_"):
+            comment_ids.append(f"t1_{target_comment_id}")
+        selectors = []
+        for comment_id in comment_ids:
+            selectors.extend(
+                [
+                    f'shreddit-comment[thingid="{comment_id}"]',
+                    f'[thingid="{comment_id}"]',
+                    f'[id="{comment_id}"]',
+                    f'[data-testid="comment"][id*="{comment_id}"]',
+                    f'[data-fullname="{comment_id}"]',
+                ]
+            )
+        return selectors
 
     async def _type_and_submit(self, page, editor_coords, text: str):
         await page.mouse.click(editor_coords["x"], editor_coords["y"])
@@ -215,12 +238,19 @@ class PlaywrightPostingTransport:
         await page.wait_for_timeout(2000)
         return True
 
-    async def _post_comment(self, page, post_url: str, reply_text: str, is_reply_to_comment: bool = False):
-        await page.goto(post_url, wait_until="domcontentloaded")
+    def _comment_permalink(self, post_url: str, target_comment_id: str):
+        base_url = post_url.split("#", 1)[0].split("?", 1)[0].rstrip("/")
+        if base_url.endswith(f"/{target_comment_id}") or base_url.endswith(f"/t1_{target_comment_id}"):
+            return f"{base_url}/"
+        return f"{base_url}/{target_comment_id}/"
+
+    async def _post_comment(self, page, post_url: str, reply_text: str, target_comment_id: str | None = None):
+        target_url = self._comment_permalink(post_url, target_comment_id) if target_comment_id else post_url
+        await page.goto(target_url, wait_until="domcontentloaded")
         await page.wait_for_timeout(5000)
         if await self._check_rate_limit(page):
             return False
-        editor = await self._open_reply_composer(page) if is_reply_to_comment else await self._open_post_composer(page)
+        editor = await self._open_reply_composer(page, target_comment_id) if target_comment_id else await self._open_post_composer(page)
         if not editor:
             return False
         return await self._type_and_submit(page, editor, reply_text)

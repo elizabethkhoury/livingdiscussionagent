@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.storage.db import Base
@@ -59,6 +59,7 @@ class ClassificationRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=datetime.utcnow)
 
     thread: Mapped[ThreadRecord] = relationship(back_populates="classifications")
+    target_comment: Mapped[ThreadCommentRecord | None] = relationship()
     decision: Mapped[DecisionRecord] = relationship(back_populates="classification", uselist=False)
 
 
@@ -111,9 +112,19 @@ class ReviewRecord(Base):
 
 class PostAttemptRecord(Base):
     __tablename__ = "post_attempts"
+    __table_args__ = (
+        Index(
+            "uq_post_attempts_active_reply_target",
+            "reply_target_key",
+            unique=True,
+            postgresql_where=text("reply_target_key IS NOT NULL AND status IN ('pending', 'posted')"),
+            sqlite_where=text("reply_target_key IS NOT NULL AND status IN ('pending', 'posted')"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     draft_id: Mapped[int] = mapped_column(ForeignKey("drafts.id"), index=True)
+    reply_target_key: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     transport: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(32), default="pending")
     posted_comment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
