@@ -2,7 +2,86 @@
 {% block content %}
 <section>
   <h1>Settings</h1>
+  {% if active_halt %}
+    <h2>Agent halted</h2>
+    <p><strong>{{ active_halt.reason_code }}</strong>: {{ active_halt.reason }}</p>
+    <p>Halted at {{ active_halt.created_at }}</p>
+    <h3>Observed values</h3>
+    <pre>{{ active_halt.observed_json }}</pre>
+    <h3>Thresholds</h3>
+    <pre>{{ active_halt.thresholds_json }}</pre>
+    <form method="post" action="/settings/agent-halt/resume">
+      <label for="resume-note">Resume note</label>
+      <textarea id="resume-note" name="note"></textarea>
+      <button type="submit">Resume agent</button>
+    </form>
+  {% else %}
+    <p><span class="pill">Agent active</span></p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Account Health</h2>
+  <h3>Thresholds</h3>
+  <table>
+    <tbody>
+      {% for key, value in account_health_thresholds.items() %}
+        <tr>
+          <th>{{ key }}</th>
+          <td>{{ value }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3>Latest snapshot</h3>
+  {% if latest_snapshot %}
+    <table>
+      <tbody>
+        <tr><th>Username</th><td>{{ latest_snapshot.username }}</td></tr>
+        <tr><th>Date</th><td>{{ latest_snapshot.snapshot_date }}</td></tr>
+        <tr><th>Captured</th><td>{{ latest_snapshot.captured_at }}</td></tr>
+        <tr><th>Total karma</th><td>{{ latest_snapshot.total_karma }}</td></tr>
+        <tr><th>Comment karma</th><td>{{ latest_snapshot.comment_karma }}</td></tr>
+        <tr><th>Link karma</th><td>{{ latest_snapshot.link_karma }}</td></tr>
+        <tr><th>Total karma delta</th><td>{{ latest_snapshot.total_karma_delta }}</td></tr>
+        <tr><th>Tracked post score total</th><td>{{ latest_snapshot.tracked_post_score_total }}</td></tr>
+        <tr><th>Tracked post score delta</th><td>{{ latest_snapshot.tracked_post_score_delta }}</td></tr>
+      </tbody>
+    </table>
+  {% else %}
+    <p>No account health snapshot has been recorded yet.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Account Health Events</h2>
+  {% if health_events %}
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Type</th>
+          <th>Payload</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in health_events %}
+          <tr>
+            <td>{{ event.created_at }}</td>
+            <td>{{ event.event_type }}</td>
+            <td><pre>{{ event.payload_json }}</pre></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No account health events have been recorded yet.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Raw Settings</h2>
   <pre>{{ settings }}</pre>
 </section>
 {% endblock %}
-

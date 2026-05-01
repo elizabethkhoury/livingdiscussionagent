@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.storage.db import Base
@@ -181,3 +181,44 @@ class SystemEventRecord(Base):
     event_type: Mapped[str] = mapped_column(String(128), index=True)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=datetime.utcnow)
+
+
+class AccountHealthSnapshotRecord(Base):
+    __tablename__ = "account_health_snapshots"
+    __table_args__ = (
+        UniqueConstraint("username", "snapshot_date", name="uq_account_health_snapshot_user_date"),
+        Index("ix_account_health_snapshots_username_date", "username", "snapshot_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(128), index=True)
+    snapshot_date: Mapped[date] = mapped_column(Date, index=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=datetime.utcnow)
+    link_karma: Mapped[int] = mapped_column(Integer, default=0)
+    comment_karma: Mapped[int] = mapped_column(Integer, default=0)
+    total_karma: Mapped[int] = mapped_column(Integer, default=0)
+    link_karma_delta: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    comment_karma_delta: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_karma_delta: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tracked_post_score_total: Mapped[int] = mapped_column(Integer, default=0)
+    tracked_post_score_delta: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    halts: Mapped[list[AgentHaltRecord]] = relationship(back_populates="triggered_by_snapshot")
+
+
+class AgentHaltRecord(Base):
+    __tablename__ = "agent_halts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reason_code: Mapped[str] = mapped_column(String(128), index=True)
+    reason: Mapped[str] = mapped_column(Text)
+    triggered_by_snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("account_health_snapshots.id"), nullable=True, index=True)
+    thresholds_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    observed_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), default=datetime.utcnow, index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True, index=True)
+    resolved_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    triggered_by_snapshot: Mapped[AccountHealthSnapshotRecord | None] = relationship(back_populates="halts")

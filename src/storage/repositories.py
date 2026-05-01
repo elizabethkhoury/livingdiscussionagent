@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.domain.enums import AttemptStatus, DraftStatus
-from src.domain.models import ClassificationResult, DecisionResult, DraftReply, EngagementSnapshot
+from src.domain.models import AccountHealthSnapshot, ClassificationResult, DecisionResult, DraftReply, EngagementSnapshot
 from src.storage import schema
 
 
@@ -412,3 +412,110 @@ class LearningRepository:
     def latest_threshold_event(self):
         stmt = select(schema.SystemEventRecord).where(schema.SystemEventRecord.event_type == "threshold_update").order_by(desc(schema.SystemEventRecord.id))
         return self.session.scalar(stmt)
+
+
+class AccountHealthRepository:
+    def __init__(self, session: Session):
+        self.session = session
+
+    def upsert_daily_snapshot(self, snapshot: AccountHealthSnapshot):
+        record = self.session.scalar(
+            select(schema.AccountHealthSnapshotRecord).where(
+                schema.AccountHealthSnapshotRecord.username == snapshot.username,
+                schema.AccountHealthSnapshotRecord.snapshot_date == snapshot.snapshot_date,
+            )
+        )
+        values = snapshot.model_dump()
+        if record is None:
+            record = schema.AccountHealthSnapshotRecord(**values)
+            self.session.add(record)
+        else:
+            for key, value in values.items():
+                setattr(record, key, value)
+        self.session.flush()
+        return record
+
+    def latest_snapshot(self, username: str):
+        stmt = (
+            select(schema.AccountHealthSnapshotRecord)
+            .where(schema.AccountHealthSnapshotRecord.username == username)
+            .order_by(desc(schema.AccountHealthSnapshotRecord.snapshot_date), desc(schema.AccountHealthSnapshotRecord.captured_at), desc(schema.AccountHealthSnapshotRecord.id))
+        )
+        return self.session.scalar(stmt)
+
+    def latest_snapshot_before(self, username: str, snapshot_date: date):
+        stmt = (
+            select(schema.AccountHealthSnapshotRecord)
+            .where(schema.AccountHealthSnapshotRecord.username == username)
+            .where(schema.AccountHealthSnapshotRecord.snapshot_date < snapshot_date)
+            .order_by(desc(schema.AccountHealthSnapshotRecord.snapshot_date), desc(schema.AccountHealthSnapshotRecord.captured_at), desc(schema.AccountHealthSnapshotRecord.id))
+        )
+        return self.session.scalar(stmt)
+
+    def latest_active_halt(self):
+        stmt = select(schema.AgentHaltRecord).where(schema.AgentHaltRecord.resolved_at.is_(None)).order_by(desc(schema.AgentHaltRecord.id))
+        return self.session.scalar(stmt)
+
+    def create_halt(self, reason_code: str, reason: str, snapshot_id: int | None, thresholds: dict, observed: dict):
+        record = schema.AgentHaltRecord(
+            reason_code=reason_code,
+            reason=reason,
+            triggered_by_snapshot_id=snapshot_id,
+            thresholds_json=thresholds,
+            observed_json=observed,
+        )
+        self.session.add(record)
+        self.session.flush()
+        return record
+
+    def resolve_active_halt(self, resolved_by: str = "manual", note: str | None = None):
+        record = self.latest_active_halt()
+        if record is None:
+            return None
+        record.resolved_at = datetime.utcnow()
+        record.resolved_by = resolved_by
+        record.resolution_note = note
+        self.session.flush()
+        return record
+
+    def recent_posted_attempts_for_health(self, lookback_days: int):
+        cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+        stmt = (
+            select(schema.PostAttemptRecord)
+            .where(schema.PostAttemptRecord.status == AttemptStatus.POSTED.value)
+            .where(schema.PostAttemptRecord.posted_at.is_not(None))
+            .where(schema.PostAttemptRecord.posted_at >= cutoff)
+            .order_by(schema.PostAttemptRecord.posted_at.asc())
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def latest_snapshot_for_attempt(self, post_attempt_id: int):
+        stmt = (
+            select(schema.EngagementSnapshotRecord)
+            .where(schema.EngagementSnapshotRecord.post_attempt_id == post_attempt_id)
+            .order_by(desc(schema.EngagementSnapshotRecord.captured_at), desc(schema.EngagementSnapshotRecord.id))
+        )
+        return self.session.scalar(stmt)
+
+    def log_event(self, event_type: str, payload: dict):
+        record = schema.SystemEventRecord(event_type=event_type, payload_json=payload)
+        self.session.add(record)
+        self.session.flush()
+        return record
+
+    def recent_health_events(self, limit: int = 20):
+        event_types = [
+            "account_health_snapshot_recorded",
+            "account_health_fetch_failed",
+            "account_health_missing_username",
+            "agent_halted",
+            "operation_blocked_by_halt",
+            "agent_resumed",
+        ]
+        stmt = (
+            select(schema.SystemEventRecord)
+            .where(schema.SystemEventRecord.event_type.in_(event_types))
+            .order_by(desc(schema.SystemEventRecord.created_at), desc(schema.SystemEventRecord.id))
+            .limit(limit)
+        )
+        return list(self.session.scalars(stmt).all())

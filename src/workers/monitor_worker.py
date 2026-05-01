@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from src.learn.feature_builder import build_learning_features
+from src.monitor.account_health import AccountHealthService
 from src.monitor.engagement_fetcher import RedditEngagementFetcher
 from src.monitor.moderation_signals import classify_negative_signal
+from src.runtime.halt_guard import operation_blocked_result
 from src.storage.db import session_scope
 from src.storage.repositories import DecisionRepository, LearningRepository
 
@@ -10,8 +12,15 @@ from src.storage.repositories import DecisionRepository, LearningRepository
 class MonitorWorker:
     def __init__(self):
         self.fetcher = RedditEngagementFetcher()
+        self.account_health = AccountHealthService()
 
     def run_once(self):
+        blocked = operation_blocked_result("monitor-once")
+        if blocked is not None:
+            return blocked
+        account_health_result = self.account_health.run_once()
+        if account_health_result.get("status") in {"halted", "already_halted"}:
+            return {"account_health": account_health_result, "snapshots": []}
         snapshots = []
         with session_scope() as session:
             repo = DecisionRepository(session)

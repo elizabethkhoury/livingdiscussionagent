@@ -179,6 +179,46 @@ class RuntimeThresholds(BaseModel):
     autopost_overall_threshold: float
 
 
+class AccountHealthSnapshot(BaseModel):
+    username: str
+    snapshot_date: date
+    link_karma: int
+    comment_karma: int
+    total_karma: int
+    link_karma_delta: int | None = None
+    comment_karma_delta: int | None = None
+    total_karma_delta: int | None = None
+    tracked_post_score_total: int = 0
+    tracked_post_score_delta: int | None = None
+    captured_at: datetime = Field(default_factory=datetime.utcnow)
+    source_payload_json: dict = Field(default_factory=dict)
+
+
+class AccountHealthThresholds(BaseModel):
+    min_total_karma: int
+    min_comment_karma: int
+    min_link_karma: int
+    max_daily_total_karma_drop: int
+    min_daily_tracked_score_delta: int
+
+
+class AccountHealthEvaluation(BaseModel):
+    healthy: bool
+    reason_codes: list[str] = Field(default_factory=list)
+    reason: str
+    thresholds: dict[str, int] = Field(default_factory=dict)
+    observed: dict[str, int | None] = Field(default_factory=dict)
+
+
+class AgentHaltStatus(BaseModel):
+    halt_id: int
+    reason_code: str
+    reason: str
+    created_at: datetime
+    thresholds: dict = Field(default_factory=dict)
+    observed: dict = Field(default_factory=dict)
+
+
 @dataclass
 class CircuitBreakerState:
     moderator_removals: int = 0

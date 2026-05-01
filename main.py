@@ -8,7 +8,9 @@ import uvicorn
 from src.app.logging import configure_logging
 from src.app.settings import get_settings
 from src.learn.diary_builder import DiaryBuilder
+from src.monitor.account_health import AccountHealthService
 from src.review.api import create_review_app
+from src.runtime.halt_guard import operation_blocked_result, resume_agent
 from src.storage.db import Base, engine
 from src.workers.ingest_worker import IngestWorker
 from src.workers.learning_worker import LearningWorker
@@ -24,7 +26,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description="PromptHunt Reddit agent")
     parser.add_argument(
         "command",
-        choices=["bootstrap", "dashboard", "ingest-once", "review-once", "monitor-once", "learn-once", "memory-once"],
+        choices=["bootstrap", "dashboard", "ingest-once", "review-once", "monitor-once", "learn-once", "memory-once", "account-health-once", "resume-agent"],
     )
     return parser
 
@@ -33,20 +35,25 @@ async def run_async_command(command: str):
     if command == "bootstrap":
         bootstrap()
         return {"status": "ok", "command": command}
-    if command == "ingest-once":
+    if command == "account-health-once":
         bootstrap()
+        return AccountHealthService().run_once()
+    if command == "resume-agent":
+        bootstrap()
+        return resume_agent()
+    bootstrap()
+    blocked = operation_blocked_result(command)
+    if blocked is not None:
+        return blocked
+    if command == "ingest-once":
         return IngestWorker().run_once()
     if command == "review-once":
-        bootstrap()
         return await ReviewWorker().run_once()
     if command == "monitor-once":
-        bootstrap()
         return MonitorWorker().run_once()
     if command == "learn-once":
-        bootstrap()
         return LearningWorker().run_once()
     if command == "memory-once":
-        bootstrap()
         return DiaryBuilder().update(force_monthly=True)
     raise ValueError(f"Unknown command: {command}")
 

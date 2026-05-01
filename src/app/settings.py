@@ -70,6 +70,13 @@ class AppSettings(BaseSettings):
     subreddit_daily_cap: int = 2
     moderator_removals_circuit_breaker: int = 2
     rate_limits_circuit_breaker: int = 3
+    account_health_enabled: bool = Field(default=True, alias="ACCOUNT_HEALTH_ENABLED")
+    account_health_min_total_karma: int = Field(default=0, alias="ACCOUNT_HEALTH_MIN_TOTAL_KARMA")
+    account_health_min_comment_karma: int = Field(default=0, alias="ACCOUNT_HEALTH_MIN_COMMENT_KARMA")
+    account_health_min_link_karma: int = Field(default=0, alias="ACCOUNT_HEALTH_MIN_LINK_KARMA")
+    account_health_max_daily_total_karma_drop: int = Field(default=25, alias="ACCOUNT_HEALTH_MAX_DAILY_TOTAL_KARMA_DROP")
+    account_health_min_daily_tracked_score_delta: int = Field(default=-5, alias="ACCOUNT_HEALTH_MIN_DAILY_TRACKED_SCORE_DELTA")
+    account_health_post_lookback_days: int = Field(default=30, alias="ACCOUNT_HEALTH_POST_LOOKBACK_DAYS")
     ingest_interval_seconds: int = 300
     review_interval_seconds: int = 60
     monitor_interval_seconds: int = 600

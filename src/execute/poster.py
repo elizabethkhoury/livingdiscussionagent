@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from src.app.settings import get_settings
 from src.domain.models import CircuitBreakerState
 from src.execute.playwright_transport import PlaywrightPostingTransport
+from src.runtime.halt_guard import get_active_halt, log_blocked_operation
 from src.storage.db import session_scope
 from src.storage.repositories import DecisionRepository, ThreadRepository
 
@@ -15,6 +16,10 @@ class PostingService:
         self.transport = PlaywrightPostingTransport()
 
     def can_post(self, subreddit: str):
+        halt = get_active_halt()
+        if halt is not None:
+            log_blocked_operation("posting", halt)
+            return False, CircuitBreakerState(failure_events=[f"agent_halted:{halt.reason_code}"])
         with session_scope() as session:
             decisions = DecisionRepository(session)
             threads = ThreadRepository(session)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from src.app.config import get_default_thresholds
 from src.execute.poster import PostingService
+from src.runtime.halt_guard import operation_blocked_result
 from src.storage.db import session_scope
 from src.storage.repositories import DecisionRepository
 
@@ -12,6 +13,9 @@ class ReviewWorker:
         self.thresholds = get_default_thresholds()
 
     async def run_once(self):
+        blocked = operation_blocked_result("review-once")
+        if blocked is not None:
+            return blocked
         with session_scope() as session:
             repo = DecisionRepository(session)
             pending_drafts = repo.list_drafts_by_status("created") + repo.list_drafts_by_status("approved")

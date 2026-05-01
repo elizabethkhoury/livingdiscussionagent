@@ -1,5 +1,6 @@
 from src.learn.diary_builder import DiaryBuilder
 from src.learn.trainer import LearningTrainer
+from src.runtime.halt_guard import operation_blocked_result
 
 
 class LearningWorker:
@@ -8,6 +9,9 @@ class LearningWorker:
         self.diary_builder = DiaryBuilder()
 
     def run_once(self):
+        blocked = operation_blocked_result("learn-once")
+        if blocked is not None:
+            return blocked
         learning_report = self.trainer.update()
         diary_report = self.diary_builder.update()
         return {

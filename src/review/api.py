@@ -9,8 +9,9 @@ from fastapi.templating import Jinja2Templates
 from src.app.settings import get_settings
 from src.learn.diary_memory import load_memory_context
 from src.review.service import ReviewService
+from src.runtime.halt_guard import resume_agent
 from src.storage.db import session_scope
-from src.storage.repositories import DecisionRepository, LearningRepository
+from src.storage.repositories import AccountHealthRepository, DecisionRepository, LearningRepository
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
@@ -120,10 +121,35 @@ def create_review_app():
     @app.get("/settings", response_class=HTMLResponse)
     def settings_dashboard(request: Request):
         settings = get_settings()
+        username = settings.reddit_username
+        with session_scope() as session:
+            account_health = AccountHealthRepository(session)
+            latest_snapshot = account_health.latest_snapshot(username) if username else None
+            active_halt = account_health.latest_active_halt()
+            health_events = account_health.recent_health_events()
+        thresholds = {
+            "min_total_karma": settings.account_health_min_total_karma,
+            "min_comment_karma": settings.account_health_min_comment_karma,
+            "min_link_karma": settings.account_health_min_link_karma,
+            "max_daily_total_karma_drop": settings.account_health_max_daily_total_karma_drop,
+            "min_daily_tracked_score_delta": settings.account_health_min_daily_tracked_score_delta,
+        }
         return templates.TemplateResponse(
             request,
             "settings.html",
-            {"settings": settings.model_dump(), "title": "Settings"},
+            {
+                "settings": settings.model_dump(),
+                "title": "Settings",
+                "latest_snapshot": latest_snapshot,
+                "active_halt": active_halt,
+                "health_events": health_events,
+                "account_health_thresholds": thresholds,
+            },
         )
+
+    @app.post("/settings/agent-halt/resume")
+    def resume_halted_agent(note: str = Form(default="")):
+        resume_agent(resolved_by="dashboard", note=note or None)
+        return RedirectResponse(url="/settings", status_code=303)
 
     return app

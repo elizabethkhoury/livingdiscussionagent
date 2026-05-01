@@ -10,6 +10,7 @@ from src.generate.draft_writer import DraftWriter
 from src.generate.evaluators import DraftEvaluator
 from src.ingest.candidate_selector import CandidateSelector
 from src.ingest.reddit_reader import RedditJSONReader
+from src.runtime.halt_guard import operation_blocked_result
 from src.storage.db import session_scope
 from src.storage.repositories import DecisionRepository, ThreadRepository
 
@@ -24,6 +25,9 @@ class IngestWorker:
         self.draft_evaluator = DraftEvaluator()
 
     def run_once(self):
+        blocked = operation_blocked_result("ingest-once")
+        if blocked is not None:
+            return blocked
         processed = []
         recently_classified_thread_ids = self._recently_classified_thread_ids()
         for subreddit in self._enabled_subreddits():
