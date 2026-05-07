@@ -10,8 +10,10 @@ from src.generate.evaluators import DraftEvaluator
 class StubLLMClient:
     def __init__(self, response: str):
         self.response = response
+        self.messages = None
 
     def complete(self, messages):
+        self.messages = messages
         return self.response
 
 
@@ -42,6 +44,18 @@ def make_thread():
     )
 
 
+def make_weak_fit_thread():
+    return ThreadContext(
+        post=RedditPostCandidate(
+            platform_thread_id="thread-weak",
+            subreddit="ChatGPT",
+            title="How do I get better outputs from ChatGPT?",
+            body="My answers are vague and I am not sure what detail to add.",
+            url="https://example.com",
+        )
+    )
+
+
 def make_decision(promotion_mode: PromotionMode):
     return DecisionResult(
         action=DecisionAction.QUEUE_REVIEW_PRODUCT,
@@ -64,14 +78,88 @@ def test_compose_uses_llm_output_when_candidate_is_safe():
     assert draft.disclosure_text is None
 
 
+def test_prompt_includes_short_reply_question_and_product_guidance():
+    client = StubLLMClient("A practical fix is to store prompts with result notes so reuse is easier later. What part gets lost most often?")
+    writer = DraftWriter(client)
+
+    draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
+
+    assert draft is not None
+    assert client.messages is not None
+    user_prompt = client.messages[-1].content
+    assert "Write 2-4 sentences." in user_prompt
+    assert "Include one natural follow-up question" in user_prompt
+    assert "Product mentions are optional unless promotion mode is disclosed_monetized." in user_prompt
+    assert "mention PromptHunt only if it directly improves the answer" in user_prompt
+
+
 def test_compose_falls_back_to_heuristic_when_llm_fails():
     writer = DraftWriter(FailingLLMClient())
 
     draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
 
     assert draft is not None
-    assert "PromptHunt could fit" in draft.body
+    assert "PromptHunt could be relevant" in draft.body
     assert draft.disclosure_text is None
+
+
+def test_compose_rejects_llm_output_over_four_sentences_and_falls_back():
+    writer = DraftWriter(StubLLMClient("Save the prompt with notes. Keep the model name. Track the output. Add reuse context. Review it later."))
+
+    draft = writer.compose(make_thread(), make_decision(PromotionMode.NONE))
+
+    assert draft is not None
+    assert draft.body != "Save the prompt with notes. Keep the model name. Track the output. Add reuse context. Review it later."
+    assert "Are you mainly losing prompts" in draft.body
+
+
+def test_compose_rejects_llm_output_over_word_limit_and_falls_back():
+    long_reply = (
+        "A practical way to handle this is to create a detailed prompt archive with the exact prompt, model name, output quality notes, "
+        "project context, reuse tags, failure cases, examples, owner notes, revision history, source links, expected output style, date tested, "
+        "team ownership, category labels, screenshots, benchmark examples, rejected variants, naming rules, workspace folders, access notes, "
+        "approval status, review cadence, prompt owner, handoff notes, audience notes, tone constraints, formatting rules, project goals, "
+        "and a long explanation of why every version worked or failed so future experiments can be reviewed carefully."
+    )
+    writer = DraftWriter(StubLLMClient(long_reply))
+
+    draft = writer.compose(make_thread(), make_decision(PromotionMode.NONE))
+
+    assert draft is not None
+    assert draft.body != long_reply
+    assert len(draft.body.split()) <= 85
+
+
+def test_plain_mention_accepts_helpful_reply_without_product():
+    body = "A practical fix is to save each prompt with result notes and reuse context so the useful versions are easier to find later. What part gets lost most often?"
+    writer = DraftWriter(StubLLMClient(body))
+
+    draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
+
+    assert draft is not None
+    assert draft.body == body
+    assert "PromptHunt" not in draft.body
+    assert draft.disclosure_text is None
+
+
+def test_plain_mention_fallback_omits_product_for_weak_fit_thread():
+    writer = DraftWriter(FailingLLMClient())
+
+    draft = writer.compose(make_weak_fit_thread(), make_decision(PromotionMode.PLAIN_MENTION))
+
+    assert draft is not None
+    assert "PromptHunt" not in draft.body
+    assert "What part of the workflow is breaking most often?" in draft.body
+
+
+def test_plain_mention_fallback_includes_product_for_strong_prompt_library_fit():
+    writer = DraftWriter(FailingLLMClient())
+
+    draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
+
+    assert draft is not None
+    assert "PromptHunt could be relevant" in draft.body
+    assert "Are you mainly losing prompts" in draft.body
 
 
 def test_compose_logs_and_falls_back_when_llm_raises(caplog):
@@ -81,7 +169,7 @@ def test_compose_logs_and_falls_back_when_llm_raises(caplog):
         draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
 
     assert draft is not None
-    assert "PromptHunt could fit" in draft.body
+    assert "PromptHunt could be relevant" in draft.body
     assert caplog.records
     record = caplog.records[-1]
     assert record.message == "LLM generation failed; using heuristic fallback"
@@ -118,7 +206,7 @@ def test_compose_logs_timeout_and_falls_back(caplog):
         draft = writer.compose(make_thread(), make_decision(PromotionMode.PLAIN_MENTION))
 
     assert draft is not None
-    assert "PromptHunt could fit" in draft.body
+    assert "PromptHunt could be relevant" in draft.body
     assert caplog.records
     record = caplog.records[-1]
     assert record.message == "LLM generation timed out; using heuristic fallback"
@@ -136,6 +224,18 @@ def test_compose_appends_disclosure_for_monetized_mode():
     assert "PromptHunt" in draft.body
     assert draft.disclosure_text == "Disclosure: I'm affiliated with PromptHunt."
     assert draft.body.endswith("Disclosure: I'm affiliated with PromptHunt.")
+
+
+def test_monetized_fallback_drops_question_to_preserve_disclosure_and_brevity():
+    writer = DraftWriter(FailingLLMClient())
+
+    draft = writer.compose(make_thread(), make_decision(PromotionMode.DISCLOSED_MONETIZED))
+
+    assert draft is not None
+    assert "PromptHunt" in draft.body
+    assert "Disclosure: I'm affiliated with PromptHunt." in draft.body
+    assert "?" not in draft.body
+    assert DraftWriter()._sentence_count(draft.body) <= 4
 
 
 def test_compose_keeps_plain_mention_mode_without_disclosure():

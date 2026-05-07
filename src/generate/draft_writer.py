@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import sys
 
 from src.app.llm import HeuristicLLMClient, LLMClient, LLMMessage, get_llm_client
@@ -12,6 +13,21 @@ from src.generate.disclosures import disclosure_for_mode
 from src.learn.memory_provider import MemoryProvider
 
 logger = logging.getLogger(__name__)
+
+MAX_REPLY_WORDS = 85
+MAX_REPLY_SENTENCES = 4
+PRODUCT_FIT_TERMS = [
+    "save prompts",
+    "organize prompts",
+    "find prompts",
+    "reuse prompts",
+    "prompt library",
+    "prompt libraries",
+    "prompt repository",
+    "shared prompts",
+    "prompt management",
+    "workflow",
+]
 
 
 class DraftWriter:
@@ -66,7 +82,7 @@ class DraftWriter:
             )
             return None
         normalized_candidate = self._normalize_candidate(candidate, decision.promotion_mode)
-        if self._is_usable_candidate(normalized_candidate, decision.promotion_mode):
+        if self._is_usable_candidate(normalized_candidate, decision.promotion_mode, candidate):
             return normalized_candidate
         return None
 
@@ -99,12 +115,18 @@ class DraftWriter:
                 disclosure_line,
                 "Constraints:",
                 "- Be helpful, specific, concise, and Reddit-native.",
+                "- Write 2-4 sentences.",
+                "- Use one compact paragraph.",
+                "- Avoid long explanations, lists, and multi-paragraph replies.",
+                "- Include one natural follow-up question when it would help continue the thread.",
+                "- Do not force a question if it would sound awkward or bait-like.",
                 "- Do not claim personal usage or experience.",
                 "- Do not use hype language like best, amazing, must-have, or game changer.",
                 "- Do not include links or URLs.",
                 "- Do not sound salesy or aggressively promotional.",
                 "- If promotion mode is none, do not mention PromptHunt.",
-                "- If promotion mode is plain_mention, a soft PromptHunt mention is allowed but not required.",
+                "- Product mentions are optional unless promotion mode is disclosed_monetized.",
+                "- If promotion mode is plain_mention, mention PromptHunt only if it directly improves the answer.",
                 "- If promotion mode is disclosed_monetized, mention PromptHunt naturally and include the exact disclosure text.",
                 "",
                 "Thread context:",
@@ -130,8 +152,12 @@ class DraftWriter:
                 normalized = f"{normalized} {disclosure}".strip()
         return normalized
 
-    def _is_usable_candidate(self, candidate: str, promotion_mode: PromotionMode):
+    def _is_usable_candidate(self, candidate: str, promotion_mode: PromotionMode, raw_candidate: str | None = None):
         if not candidate or len(candidate.split()) < 12:
+            return False
+        if self._is_too_long(candidate):
+            return False
+        if raw_candidate and (self._has_paragraph_break(raw_candidate) or self._has_list_markers(raw_candidate)):
             return False
         candidate_lower = candidate.lower()
         if "http" in candidate_lower or "www." in candidate_lower:
@@ -142,21 +168,25 @@ class DraftWriter:
             return False
         if promotion_mode == PromotionMode.NONE and "prompthunt" in candidate_lower:
             return False
+        if self._product_mention_required(promotion_mode) and "prompthunt" not in candidate_lower:
+            return False
         return True
 
     def _heuristic_body(self, thread: ThreadContext, decision: DecisionResult, memory_context: MemoryContext):
-        problem = self._acknowledge(thread)
-        advice = self._advice(thread, decision.selected_strategy, memory_context)
-        body = f"{problem} {advice}"
+        sentences = [self._acknowledge(thread), self._advice(thread, decision.selected_strategy, memory_context)]
         caution = self._memory_caution(memory_context)
         if caution:
-            body = f"{body} {caution}"
-        if decision.promotion_mode == PromotionMode.PLAIN_MENTION:
-            body = f"{body} If a shared prompt library would help, a tool like PromptHunt could fit depending on whether you want private storage or community discovery."
-        if decision.promotion_mode == PromotionMode.DISCLOSED_MONETIZED:
+            sentences.append(caution)
+        if self._should_mention_product(thread, decision):
+            product_sentence = "PromptHunt could be relevant for saving or discovering prompts."
             disclosure = disclosure_for_mode(decision.promotion_mode)
-            body = f"{body} PromptHunt could be relevant here for saving or discovering prompts. {disclosure}"
-        return body.strip()
+            if disclosure:
+                product_sentence = f"{product_sentence} {disclosure}"
+            sentences.append(product_sentence)
+        question = self._follow_up_question(thread)
+        if question and decision.promotion_mode != PromotionMode.DISCLOSED_MONETIZED and len(sentences) < MAX_REPLY_SENTENCES:
+            sentences.append(question)
+        return " ".join(sentences).strip()
 
     def _acknowledge(self, thread: ThreadContext):
         text = thread.target_comment.body if thread.target_comment else thread.post.title
@@ -189,3 +219,51 @@ class DraftWriter:
         if removals or negative_rewards:
             return "Given recent outcome signals, keep the tone practical and avoid pushing a tool unless it directly fits the request."
         return ""
+
+    def _sentence_count(self, text: str):
+        stripped = text.strip()
+        if not stripped:
+            return 0
+        count = len(re.findall(r"[.!?]+(?:\s|$)", stripped))
+        return count or 1
+
+    def _has_follow_up_question(self, text: str):
+        return "?" in text
+
+    def _is_too_long(self, text: str):
+        if len(text.split()) > MAX_REPLY_WORDS:
+            return True
+        if self._sentence_count(text) > MAX_REPLY_SENTENCES:
+            return True
+        if self._has_paragraph_break(text):
+            return True
+        return self._has_list_markers(text)
+
+    def _product_mention_required(self, promotion_mode: PromotionMode):
+        return promotion_mode == PromotionMode.DISCLOSED_MONETIZED
+
+    def _should_mention_product(self, thread: ThreadContext, decision: DecisionResult):
+        if decision.promotion_mode == PromotionMode.DISCLOSED_MONETIZED:
+            return True
+        if decision.promotion_mode == PromotionMode.NONE:
+            return False
+        text = thread.combined_text.lower()
+        return any(term in text for term in PRODUCT_FIT_TERMS)
+
+    def _follow_up_question(self, thread: ThreadContext):
+        text = thread.combined_text.lower()
+        if "compare" in text or " vs " in text:
+            return "Are you comparing personal storage, team sharing, or public discovery?"
+        if "discover" in text or "shared" in text or "community" in text:
+            return "Are you mainly looking for private storage or community discovery?"
+        if "lose" in text or "save prompts" in text or "reuse" in text or "workflow" in text:
+            return "Are you mainly losing prompts across tools, or forgetting which version produced the good output?"
+        if "?" in thread.combined_text:
+            return "What part of the workflow is breaking most often?"
+        return ""
+
+    def _has_paragraph_break(self, text: str):
+        return bool(re.search(r"\n\s*\n", text.strip()))
+
+    def _has_list_markers(self, text: str):
+        return bool(re.search(r"(^|\n)\s*(?:[-*]|\d+[.)])\s+", text))
