@@ -113,8 +113,12 @@ class FakeReader:
         self.fetch_post_calls = []
         self.context_calls = []
 
-    def fetch_posts(self, subreddit: str, limit: int = 25):
+    def fetch_posts(self, subreddit: str, limit: int = 25, sort: str = "hot", time_filter: str = "day"):
         self.fetch_post_calls.append((subreddit, limit))
+        return self.posts
+
+    def fetch_quality_candidates(self, subreddit: str, target_count: int = 4):
+        self.fetch_post_calls.append((subreddit, target_count))
         return self.posts
 
     def fetch_thread_context(self, post: RedditPostCandidate, comment_limit: int = 10):

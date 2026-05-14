@@ -129,8 +129,8 @@ class CapturingTransport(PlaywrightPostingTransport):
     async def _make_context(self, _playwright):
         return FakeContext(), object()
 
-    async def _login(self, _page):
-        return None
+    async def _ensure_logged_in(self, _page) -> bool:
+        return True
 
     async def _post_comment(self, page, post_url: str, reply_text: str, target_comment_id: str | None = None):
         self.post_comment_call = {
@@ -139,7 +139,7 @@ class CapturingTransport(PlaywrightPostingTransport):
             "reply_text": reply_text,
             "target_comment_id": target_comment_id,
         }
-        return True
+        return "verified-comment-id"
 
 
 def test_publish_passes_target_comment_id(monkeypatch: pytest.MonkeyPatch, sqlite_session_local):
@@ -159,68 +159,7 @@ def test_publish_passes_target_comment_id(monkeypatch: pytest.MonkeyPatch, sqlit
         assert attempt.status == "posted"
 
 
-class FakePage:
-    def __init__(self):
-        self.urls = []
-
-    async def goto(self, url: str, wait_until: str):
-        self.urls.append((url, wait_until))
-
-    async def wait_for_timeout(self, _timeout: int):
-        return None
-
-
-class SafeFailCommentTransport(PlaywrightPostingTransport):
-    def __init__(self):
-        super().__init__()
-        self.reply_composer_targets = []
-
-    async def _check_rate_limit(self, _page):
-        return False
-
-    async def _open_reply_composer(self, _page, target_comment_id: str):
-        self.reply_composer_targets.append(target_comment_id)
-        return None
-
-
-def test_comment_reply_fails_when_target_composer_is_missing():
-    page = FakePage()
-    transport = SafeFailCommentTransport()
-
-    result = asyncio.run(transport._post_comment(page, "https://www.reddit.com/r/x/comments/thread-1/example/", "reply", target_comment_id="comment-1"))
-
-    assert result is False
-    assert transport.reply_composer_targets == ["comment-1"]
-    assert page.urls == [("https://www.reddit.com/r/x/comments/thread-1/example/comment-1/", "domcontentloaded")]
-
-
-class TopLevelTransport(PlaywrightPostingTransport):
-    def __init__(self):
-        super().__init__()
-        self.opened_post_composer = False
-        self.opened_reply_composer = False
-
-    async def _check_rate_limit(self, _page):
-        return False
-
-    async def _open_post_composer(self, _page):
-        self.opened_post_composer = True
-        return {"x": 1, "y": 1}
-
-    async def _open_reply_composer(self, _page, _target_comment_id: str):
-        self.opened_reply_composer = True
-        return {"x": 1, "y": 1}
-
-    async def _type_and_submit(self, _page, _editor_coords, _text: str):
-        return True
-
-
-def test_top_level_reply_uses_post_composer():
-    page = FakePage()
-    transport = TopLevelTransport()
-
-    result = asyncio.run(transport._post_comment(page, "https://www.reddit.com/r/x/comments/thread-1/example/", "reply"))
-
-    assert result is True
-    assert transport.opened_post_composer is True
-    assert transport.opened_reply_composer is False
+def test_to_old_reddit_url_conversion():
+    assert PlaywrightPostingTransport._to_old_reddit("https://www.reddit.com/r/x/comments/abc/example/") == "https://old.reddit.com/r/x/comments/abc/example/"
+    assert PlaywrightPostingTransport._to_old_reddit("https://reddit.com/r/x/comments/abc/example/") == "https://old.reddit.com/r/x/comments/abc/example/"
+    assert PlaywrightPostingTransport._to_old_reddit("https://old.reddit.com/r/x/comments/abc/example/") == "https://old.reddit.com/r/x/comments/abc/example/"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import sys
@@ -14,7 +15,7 @@ from src.learn.memory_provider import MemoryProvider
 
 logger = logging.getLogger(__name__)
 
-MAX_REPLY_WORDS = 85
+MAX_REPLY_WORDS = 55
 MAX_REPLY_SENTENCES = 4
 PRODUCT_FIT_TERMS = [
     "save prompts",
@@ -115,11 +116,11 @@ class DraftWriter:
                 disclosure_line,
                 "Constraints:",
                 "- Be helpful, specific, concise, and Reddit-native.",
-                "- Write 2-4 sentences.",
-                "- Use one compact paragraph.",
-                "- Avoid long explanations, lists, and multi-paragraph replies.",
-                "- Include one natural follow-up question when it would help continue the thread.",
-                "- Do not force a question if it would sound awkward or bait-like.",
+                "- Write 1-3 short sentences. Hard cap: 55 words total.",
+                "- Use one compact paragraph. No lists, no multi-paragraph replies.",
+                "- Reply directly to what the OP or target comment is actually asking. Cite a concrete detail from the thread.",
+                "- DO NOT default to ending with a question. Most replies should end with a concrete observation, tip, take, or small anecdote, NOT a question. Only end with a question about 1 in 4 replies — and only if it genuinely advances the thread (not as engagement bait).",
+                "- Vary your endings across these patterns: (a) a concrete tip, (b) a direct take/opinion, (c) a small observation about a tradeoff, (d) a useful caveat, (e) a relevant follow-up question. Do NOT use pattern (e) by default.",
                 "- Do not claim personal usage or experience.",
                 "- Do not use hype language like best, amazing, must-have, or game changer.",
                 "- Do not include links or URLs.",
@@ -183,9 +184,14 @@ class DraftWriter:
             if disclosure:
                 product_sentence = f"{product_sentence} {disclosure}"
             sentences.append(product_sentence)
-        question = self._follow_up_question(thread)
-        if question and decision.promotion_mode != PromotionMode.DISCLOSED_MONETIZED and len(sentences) < MAX_REPLY_SENTENCES:
-            sentences.append(question)
+        # Only append a follow-up question on ~25% of replies, distributed deterministically
+        # by thread id so the same thread always gets the same treatment (idempotent).
+        # Use hashlib for cross-run stability (Python's hash() varies per process).
+        should_ask_question = hashlib.md5(thread.thread_id.encode()).digest()[0] % 4 == 0
+        if should_ask_question:
+            question = self._follow_up_question(thread)
+            if question and decision.promotion_mode != PromotionMode.DISCLOSED_MONETIZED and len(sentences) < MAX_REPLY_SENTENCES:
+                sentences.append(question)
         return " ".join(sentences).strip()
 
     def _acknowledge(self, thread: ThreadContext):

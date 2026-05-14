@@ -26,6 +26,8 @@ class RedditPostCandidate(BaseModel):
     author: str = ""
     age_hours: float = 0.0
     num_comments: int = 0
+    score: int = 0
+    upvote_ratio: float = 0.0
     created_at_platform: datetime | None = None
 
 

@@ -32,7 +32,7 @@ def test_fetch_posts_logs_status_code_and_url_on_http_error(monkeypatch: pytest.
         assert reader.fetch_posts("missing") == []
 
     assert "status_code=404" in caplog.text
-    assert "url=https://www.reddit.com/r/missing/new.json?limit=25" in caplog.text
+    assert "url=https://www.reddit.com/r/missing/hot.json?limit=25" in caplog.text
     assert "error=HTTP Error 404: Not Found" in caplog.text
 
 

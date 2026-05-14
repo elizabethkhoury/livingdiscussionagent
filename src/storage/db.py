@@ -11,7 +11,15 @@ class Base(DeclarativeBase):
 
 
 settings = get_settings()
-engine = create_engine(settings.postgres_dsn, future=True)
+engine = create_engine(
+    settings.postgres_dsn,
+    future=True,
+    # Neon / managed Postgres providers close idle connections after a few minutes.
+    # pool_pre_ping checks the connection is live before handing it out, and
+    # pool_recycle proactively recycles any connection older than 5 min.
+    pool_pre_ping=True,
+    pool_recycle=300,
+)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, class_=Session)
 
 

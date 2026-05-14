@@ -34,7 +34,7 @@ def make_classification(**overrides):
 def test_low_relevance_skips():
     decision = RuleBasedDecisionEngine().decide(
         make_thread("How do I save prompts?"),
-        make_classification(relevance_score=0.5),
+        make_classification(relevance_score=0.2),
     )
     assert decision.action.value == "skip"
 

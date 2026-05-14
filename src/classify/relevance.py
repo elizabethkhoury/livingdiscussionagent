@@ -26,20 +26,51 @@ class RelevanceClassifier:
         keyword_hits = sum(
             token in text
             for token in [
+                # Direct prompt-management terms
                 "prompt",
                 "prompts",
-                "chatgpt",
-                "claude",
-                "cursor",
-                "lovable",
-                "midjourney",
-                "stable diffusion",
                 "system prompt",
                 "reuse",
                 "library",
+                "workflow",
+                # AI models / products we know about
+                "chatgpt",
+                "claude",
+                "gpt-4",
+                "gpt-5",
+                "openai",
+                "anthropic",
+                "gemini",
+                "cursor",
+                "lovable",
+                "replit",
+                "bolt.new",
+                "v0",
+                "midjourney",
+                "stable diffusion",
+                # General AI / LLM language
+                "llm",
+                "ai tool",
+                "ai agent",
+                "agent",
+                "rag",
+                "embedding",
+                "vibe coding",
+                "vibe coder",
+                "no-code",
+                "no code",
+                "nocode",
+                # Reddit-side intent signals
+                "building",
+                "built",
+                "saas",
+                "side project",
+                "indie",
+                "launch",
             ]
         )
-        keyword_score = min(1.0, 0.18 * keyword_hits)
+        # 0.12 per keyword hit means 3 hits = 0.36, 5 hits = 0.60, 6 hits = 0.72.
+        keyword_score = min(1.0, 0.12 * keyword_hits)
         if self.model and self.topic_embeddings:
             embedding = self.model.encode([thread.combined_text]).tolist()[0]
             similarities = []

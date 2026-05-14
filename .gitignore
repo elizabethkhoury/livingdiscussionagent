@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 runtime_failures/
 memory/
+chrome_profile/

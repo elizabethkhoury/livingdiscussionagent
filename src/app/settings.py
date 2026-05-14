@@ -81,9 +81,9 @@ class AppSettings(BaseSettings):
     review_interval_seconds: int = 60
     monitor_interval_seconds: int = 600
     learning_interval_seconds: int = 86400
-    relevance_threshold_default: float = 0.65
-    value_add_threshold_default: float = 0.70
-    autopost_overall_threshold_default: float = 0.80
+    relevance_threshold_default: float = 0.30
+    value_add_threshold_default: float = 0.60
+    autopost_overall_threshold_default: float = 0.70
     memory_diary_path: str = Field(default="memory/agent_diary.md", alias="MEMORY_DIARY_PATH")
     memory_recent_days: int = Field(default=30, alias="MEMORY_RECENT_DAYS")
     memory_monthly_recap_months: int = Field(default=6, alias="MEMORY_MONTHLY_RECAP_MONTHS")

@@ -31,11 +31,13 @@ class IngestWorker:
         processed = []
         recently_classified_thread_ids = self._recently_classified_thread_ids()
         for subreddit in self._enabled_subreddits():
-            for post in self.reader.fetch_posts(subreddit, limit=self.settings.reddit_posts_per_subreddit):
+            # Pull the highest-engagement candidates from /hot + /top day, ranked by score+comments+freshness.
+            quality_candidates = self.reader.fetch_quality_candidates(
+                subreddit, target_count=self.settings.reddit_posts_per_subreddit
+            )
+            for post in quality_candidates:
                 if self.reader.rate_limited:
                     break
-                if post.age_hours > 24:
-                    continue
                 if post.platform_thread_id in recently_classified_thread_ids:
                     continue
                 full_thread = self.reader.fetch_thread_context(post, comment_limit=self.settings.reddit_comment_limit)

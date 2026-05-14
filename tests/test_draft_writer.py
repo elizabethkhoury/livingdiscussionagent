@@ -87,8 +87,8 @@ def test_prompt_includes_short_reply_question_and_product_guidance():
     assert draft is not None
     assert client.messages is not None
     user_prompt = client.messages[-1].content
-    assert "Write 2-4 sentences." in user_prompt
-    assert "Include one natural follow-up question" in user_prompt
+    assert "Write 1-3 short sentences. Hard cap: 55 words total." in user_prompt
+    assert "DO NOT default to ending with a question" in user_prompt
     assert "Product mentions are optional unless promotion mode is disclosed_monetized." in user_prompt
     assert "mention PromptHunt only if it directly improves the answer" in user_prompt
 
@@ -110,7 +110,8 @@ def test_compose_rejects_llm_output_over_four_sentences_and_falls_back():
 
     assert draft is not None
     assert draft.body != "Save the prompt with notes. Keep the model name. Track the output. Add reuse context. Review it later."
-    assert "Are you mainly losing prompts" in draft.body
+    # Fell back to heuristic — verify it returned the heuristic body shape, not the LLM output
+    assert "workflow" in draft.body.lower() or "prompt" in draft.body.lower()
 
 
 def test_compose_rejects_llm_output_over_word_limit_and_falls_back():
@@ -149,7 +150,8 @@ def test_plain_mention_fallback_omits_product_for_weak_fit_thread():
 
     assert draft is not None
     assert "PromptHunt" not in draft.body
-    assert "What part of the workflow is breaking most often?" in draft.body
+    # Question appearance is now probabilistic (~25% by stable hash of thread_id),
+    # so we only assert the product mention is absent for weak-fit threads.
 
 
 def test_plain_mention_fallback_includes_product_for_strong_prompt_library_fit():
@@ -159,7 +161,8 @@ def test_plain_mention_fallback_includes_product_for_strong_prompt_library_fit()
 
     assert draft is not None
     assert "PromptHunt could be relevant" in draft.body
-    assert "Are you mainly losing prompts" in draft.body
+    # Question appearance is now probabilistic (~25% by stable hash of thread_id),
+    # so we don't assert a specific follow-up question.
 
 
 def test_compose_logs_and_falls_back_when_llm_raises(caplog):

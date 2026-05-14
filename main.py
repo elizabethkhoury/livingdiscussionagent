@@ -7,13 +7,16 @@ import uvicorn
 
 from src.app.logging import configure_logging
 from src.app.settings import get_settings
+from src.execute.reddit_login import launch_login_session
 from src.learn.diary_builder import DiaryBuilder
 from src.monitor.account_health import AccountHealthService
 from src.review.api import create_review_app
 from src.runtime.halt_guard import operation_blocked_result, resume_agent
 from src.storage.db import Base, engine
+from src.workers.conversation_worker import ConversationWorker
 from src.workers.ingest_worker import IngestWorker
 from src.workers.learning_worker import LearningWorker
+from src.workers.loop_worker import LoopWorker
 from src.workers.monitor_worker import MonitorWorker
 from src.workers.review_worker import ReviewWorker
 
@@ -26,7 +29,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description="PromptHunt Reddit agent")
     parser.add_argument(
         "command",
-        choices=["bootstrap", "dashboard", "ingest-once", "review-once", "monitor-once", "learn-once", "memory-once", "account-health-once", "resume-agent"],
+        choices=["bootstrap", "dashboard", "ingest-once", "review-once", "monitor-once", "learn-once", "memory-once", "account-health-once", "resume-agent", "reddit-login", "loop", "conversation-once"],
     )
     return parser
 
@@ -35,6 +38,8 @@ async def run_async_command(command: str):
     if command == "bootstrap":
         bootstrap()
         return {"status": "ok", "command": command}
+    if command == "reddit-login":
+        return await launch_login_session()
     if command == "account-health-once":
         bootstrap()
         return AccountHealthService().run_once()
@@ -55,6 +60,11 @@ async def run_async_command(command: str):
         return LearningWorker().run_once()
     if command == "memory-once":
         return DiaryBuilder().update(force_monthly=True)
+    if command == "conversation-once":
+        return await ConversationWorker().run_once()
+    if command == "loop":
+        await LoopWorker().run_forever()
+        return None
     raise ValueError(f"Unknown command: {command}")
 
 
