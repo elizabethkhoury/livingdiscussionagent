@@ -10,11 +10,19 @@ from src.generate.evaluators import DraftEvaluator
 class StubLLMClient:
     def __init__(self, response: str):
         self.response = response
-        self.messages = None
+        self.messages = None  # Last call's messages
+        self.all_messages = []  # Every call's messages, in order
+        self.call_count = 0
 
     def complete(self, messages):
-        self.messages = messages
-        return self.response
+        self.call_count += 1
+        self.all_messages.append(messages)
+        # First call is always the draft-generation prompt. Subsequent calls
+        # (on-topic judge, retries) get a "yes" so the gate passes.
+        if self.call_count == 1:
+            self.messages = messages
+            return self.response
+        return "yes"
 
 
 class FailingLLMClient:
@@ -87,7 +95,7 @@ def test_prompt_includes_short_reply_question_and_product_guidance():
     assert draft is not None
     assert client.messages is not None
     user_prompt = client.messages[-1].content
-    assert "Write 1-3 short sentences. Hard cap: 55 words total." in user_prompt
+    assert "Aim for 20-40 words. Hard cap: 45 words." in user_prompt
     assert "DO NOT default to ending with a question" in user_prompt
     assert "Product mentions are optional unless promotion mode is disclosed_monetized." in user_prompt
     assert "mention PromptHunt only if it directly improves the answer" in user_prompt

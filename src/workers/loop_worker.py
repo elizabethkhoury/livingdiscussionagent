@@ -12,6 +12,8 @@ from src.workers.ingest_worker import IngestWorker
 from src.workers.learning_worker import LearningWorker
 from src.workers.monitor_worker import MonitorWorker
 from src.workers.review_worker import ReviewWorker
+from src.workers.shadowban_canary import ShadowbanCanary
+from src.workers.upvote_booster_worker import UpvoteBoosterWorker
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +72,34 @@ class LoopWorker:
             except Exception as exc:
                 logger.exception("monitor failed: %s", exc)
                 print(f"[loop] monitor failed: {exc}")
+
+            # Shadowban canary: cheap (a few JSON fetches), runs every cycle so we
+            # catch a shadowban quickly. If it fires a halt, subsequent workers
+            # auto-skip via operation_blocked_result.
+            try:
+                canary_result = ShadowbanCanary().run_once()
+                status = canary_result.get("status", "ok") if isinstance(canary_result, dict) else canary_result
+                print(f"[loop] canary: {status}")
+                if status == "halt_fired":
+                    print(f"[loop] !!! HALT FIRED: {canary_result.get('reason')} — posting will pause until resolved with `python main.py resume-agent`")
+            except Exception as exc:
+                logger.exception("canary failed: %s", exc)
+                print(f"[loop] canary failed: {exc}")
+
+            # Upvote booster: checks recent comments for real human engagement,
+            # then has the booster account add upvotes a few minutes later.
+            # Silently skips if REDDIT_BOOSTER_USERNAME is not configured.
+            try:
+                booster_result = await UpvoteBoosterWorker().run_once()
+                boosted = booster_result.get("boosted", 0) if isinstance(booster_result, dict) else 0
+                reason = booster_result.get("reason", "") if isinstance(booster_result, dict) else ""
+                if boosted:
+                    print(f"[loop] booster: boosted {boosted} comment(s)")
+                else:
+                    print(f"[loop] booster: {reason or 'no eligible comments'}")
+            except Exception as exc:
+                logger.exception("booster failed: %s", exc)
+                print(f"[loop] booster failed: {exc}")
 
             # Run learning + diary memory occasionally (every ~6 cycles)
             if cycle % 6 == 0:

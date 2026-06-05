@@ -19,6 +19,8 @@ from src.workers.learning_worker import LearningWorker
 from src.workers.loop_worker import LoopWorker
 from src.workers.monitor_worker import MonitorWorker
 from src.workers.review_worker import ReviewWorker
+from src.workers.shadowban_canary import ShadowbanCanary
+from src.workers.upvote_booster_worker import UpvoteBoosterWorker
 
 
 def bootstrap():
@@ -29,7 +31,7 @@ def build_parser():
     parser = argparse.ArgumentParser(description="PromptHunt Reddit agent")
     parser.add_argument(
         "command",
-        choices=["bootstrap", "dashboard", "ingest-once", "review-once", "monitor-once", "learn-once", "memory-once", "account-health-once", "resume-agent", "reddit-login", "loop", "conversation-once"],
+        choices=["bootstrap", "dashboard", "ingest-once", "review-once", "monitor-once", "learn-once", "memory-once", "account-health-once", "resume-agent", "reddit-login", "loop", "conversation-once", "shadowban-canary-once", "upvote-booster-once"],
     )
     return parser
 
@@ -62,6 +64,10 @@ async def run_async_command(command: str):
         return DiaryBuilder().update(force_monthly=True)
     if command == "conversation-once":
         return await ConversationWorker().run_once()
+    if command == "shadowban-canary-once":
+        return ShadowbanCanary().run_once()
+    if command == "upvote-booster-once":
+        return await UpvoteBoosterWorker().run_once()
     if command == "loop":
         await LoopWorker().run_forever()
         return None

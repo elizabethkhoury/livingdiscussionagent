@@ -21,10 +21,16 @@ class FakeMemoryProvider(MemoryProvider):
 class CapturingLLMClient:
     def __init__(self):
         self.messages = []
+        self.call_count = 0
 
     def complete(self, messages):
-        self.messages = messages
-        return "A practical fix is to store each prompt with model notes and outcome context so reuse becomes easier later."
+        self.call_count += 1
+        # First call is the draft prompt — capture it. Later calls (e.g. the
+        # on-topic LLM judge) get "yes" so the draft flow continues.
+        if self.call_count == 1:
+            self.messages = messages
+            return "A practical fix is to store each prompt with model notes and outcome context so reuse becomes easier later."
+        return "yes"
 
 
 class FailingLLMClient:

@@ -38,6 +38,7 @@ from src.domain.models import (
 from src.execute.poster import PostingService
 from src.generate.conversation_writer import ConversationWriter
 from src.ingest.reddit_reader import RedditJSONReader
+from src.runtime.active_hours import hours_until_active, is_within_active_hours
 from src.runtime.halt_guard import operation_blocked_result
 from src.storage import schema
 from src.storage.db import session_scope
@@ -62,6 +63,9 @@ class ConversationWorker:
         blocked = operation_blocked_result("conversation-once")
         if blocked is not None:
             return blocked
+        if not is_within_active_hours():
+            wait_h = hours_until_active()
+            return [{"skipped": "outside_active_hours", "hours_until_active": round(wait_h, 1)}]
 
         candidates = self._gather_candidate_replies()
         results = []

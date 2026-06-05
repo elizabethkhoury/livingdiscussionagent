@@ -14,15 +14,32 @@ class RedditJSONReader:
     def __init__(self, request_delay_seconds: float = 0.0):
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+                          "(KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
         }
         self.logger = logging.getLogger(__name__)
         self.request_delay_seconds = request_delay_seconds
         self.rate_limited = False
         self._last_request_at: float | None = None
 
+    @staticmethod
+    def _to_old_reddit(url: str) -> str:
+        """Use old.reddit.com — less aggressive about blocking unauthenticated reads."""
+        return url.replace("www.reddit.com", "old.reddit.com")
+
     def _fetch_json(self, url: str):
-        req = request.Request(self._http_safe_url(url), headers=self.headers)
+        # Prefer old.reddit.com — it's more tolerant of unauthenticated JSON reads
+        url = self._to_old_reddit(self._http_safe_url(url))
+        req = request.Request(url, headers=self.headers)
         self._pace_requests()
         with request.urlopen(req, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
@@ -118,14 +135,18 @@ class RedditJSONReader:
                 break
 
         def passes_quality(post: RedditPostCandidate) -> bool:
-            if post.age_hours < 0.5:
-                return False  # Too new — barely any engagement signal yet.
-            if post.age_hours > 36:
-                return False  # Stale — engagement window mostly closed.
+            # Allow much younger threads through — being early on a rising thread is
+            # the single biggest engagement multiplier on Reddit.
+            if post.age_hours < 0.25:
+                return False  # Less than 15 min — no engagement signal yet.
+            if post.age_hours > 18:
+                return False  # Stale — most readers have moved on, our reply gets buried.
             if post.score < 5:
-                return False  # Not gaining traction.
-            if post.num_comments < 3:
+                return False  # Not gaining traction at all.
+            if post.num_comments < 2:
                 return False  # No discussion to join.
+            if post.num_comments > 200:
+                return False  # Too crowded — our reply will be buried below the fold.
             if post.upvote_ratio and post.upvote_ratio < 0.7:
                 return False  # Controversial / poorly received.
             return True
@@ -236,13 +257,37 @@ class RedditJSONReader:
 def quality_score(post: RedditPostCandidate) -> float:
     """Composite ranking score. Higher = better candidate to engage with.
 
-    Upvotes are the strongest signal; comments are second; freshness third.
-    Penalize posts > 24h since engagement is decaying.
+    Optimizes for engagement on OUR reply (not just thread popularity). Three signals:
+
+    1. VELOCITY — score and comments accumulated per hour. Rising-fast threads
+       are still in front of people's eyes. A 50-upvote thread that hit 50 in
+       1 hour is a much better target than a 200-upvote thread that took 12.
+
+    2. REPLY POSITION — fewer existing comments = our reply appears higher in
+       the thread = more eyeballs. The first 10 comments under a popular post
+       get an order of magnitude more views than comment #50.
+
+    3. FRESHNESS — newer threads still have an active reader pool. After ~6h
+       the thread leaves most feeds and our reply ages out into the void.
     """
-    age_penalty = max(0.0, post.age_hours - 24) * 0.5
-    return (
-        post.score * 1.0
-        + post.num_comments * 2.0
-        + max(0.0, 1.0 - post.age_hours / 24.0) * 10.0  # bonus for posts < 24h old
-        - age_penalty
-    )
+    age_hours = max(0.25, post.age_hours)
+
+    # Velocity: how fast is this thread accumulating engagement?
+    # Comments matter more than upvotes here (real discussion = real readers).
+    velocity_score = (post.score + post.num_comments * 3) / age_hours
+
+    # Reply-position bonus: fewer competing comments = our reply is more visible.
+    # Capped at 30 because beyond that, the marginal effect flattens.
+    competing_comments = min(post.num_comments, 30)
+    early_bonus = (30 - competing_comments) * 1.5
+
+    # Freshness bonus: the first 6 hours of a thread are where most reading happens.
+    freshness = max(0.0, 1.0 - age_hours / 6.0) * 20
+
+    # Hard upvote-ratio penalty: controversial threads get our reply downvoted
+    # by association even if the reply itself is good.
+    ratio_penalty = 0.0
+    if post.upvote_ratio and post.upvote_ratio < 0.85:
+        ratio_penalty = (0.85 - post.upvote_ratio) * 50
+
+    return velocity_score * 4.0 + early_bonus + freshness - ratio_penalty

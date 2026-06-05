@@ -57,6 +57,15 @@ class AppSettings(BaseSettings):
     reddit_request_delay_seconds: float = Field(default=0.25, alias="REDDIT_REQUEST_DELAY_SECONDS")
     reddit_reprocess_after_hours: int = Field(default=24, alias="REDDIT_REPROCESS_AFTER_HOURS")
     chrome_profile_dir: str = "chrome_profile"
+    # Second account used only for upvoting — keeps vote boosts on a separate identity.
+    # Set REDDIT_BOOSTER_USERNAME and REDDIT_BOOSTER_PASSWORD in .env to enable.
+    reddit_booster_username: str | None = Field(default=None, alias="REDDIT_BOOSTER_USERNAME")
+    reddit_booster_password: str | None = Field(default=None, alias="REDDIT_BOOSTER_PASSWORD")
+    chrome_profile_booster_dir: str = "chrome_profile_booster"
+    # Min real upvotes on a comment before the booster kicks in (1 = any human upvote)
+    booster_min_score: int = Field(default=2, alias="BOOSTER_MIN_SCORE")
+    # Minutes to wait after detecting a real upvote before boosting (looks natural)
+    booster_delay_minutes: int = Field(default=4, alias="BOOSTER_DELAY_MINUTES")
     enabled_subreddits: list[str] = Field(default_factory=lambda: DEFAULT_SUBREDDITS.copy())
     monetized_link_domains: list[str] = Field(default_factory=lambda: ["prompthunt.me"])
     product_name: str = "PromptHunt"
@@ -68,6 +77,18 @@ class AppSettings(BaseSettings):
     max_total_posts_per_day: int = 12
     cooldown_between_threads_minutes: int = 25
     subreddit_daily_cap: int = 2
+    # Cap on PromptHunt-mentioning posts per 24h. Kept much lower than the total
+    # daily cap so most replies are pure helpful-contributor mode and PromptHunt
+    # mentions stay rare (~15% of posts). Tuning higher trades acquisition reach
+    # for higher bot-flag risk.
+    max_promo_posts_per_day: int = 2
+    # Active posting window (UTC hours, 0-23). Posts only fire when current UTC hour
+    # is in [start, end). Wraps midnight if start > end. Default is 14:00-06:00 UTC,
+    # which is roughly 7am Pacific through 11pm Pacific — the peak engagement window
+    # for US-heavy subs. Ingest and monitor still run outside this window; only
+    # posting (primary + conversation) is gated.
+    active_hours_utc_start: int = Field(default=14, alias="ACTIVE_HOURS_UTC_START")
+    active_hours_utc_end: int = Field(default=6, alias="ACTIVE_HOURS_UTC_END")
     moderator_removals_circuit_breaker: int = 2
     rate_limits_circuit_breaker: int = 3
     account_health_enabled: bool = Field(default=True, alias="ACCOUNT_HEALTH_ENABLED")
